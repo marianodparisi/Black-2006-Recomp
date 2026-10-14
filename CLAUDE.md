@@ -19,6 +19,10 @@
   - `test_manual_code_wraps_every_moving_address` (en `scripts/test_black_release.py`) falla si alguna queda sin envolver y dice archivo y línea.
   - Contra el `recomp_manual.c` original del autor detecta las 119 direcciones que hubo que envolver.
   - Los marcadores de hooks en `generate.py` con literales van por `RELEASE.text("…{0x…}…")`.
+- **Después de agregar o cambiar direcciones**, correr `python scripts/verify_release.py --xbe game/default.xbe` (`--verbose` lista todas).
+  - Verifica estáticamente cada `BLACK_VA` y cada placeholder de `generate.py` contra el XBE: código (dirección de retorno después de un `call`, o inicio de función) y datos (referencias de operandos de instrucciones, vecinos verificados, uso junto a una dirección verificada).
+  - Sale con 1 si algo falla. Rechaza layouts incorrectos (probado con corrimientos de datos `0x10` y `0x40`, y de `.text` `0x20`).
+  - Una dirección individual mal puesta puede pasar si cae sobre otra variable que se usa: es una red de seguridad, no una prueba.
 
 ## Reglas
 
@@ -116,7 +120,12 @@ El NTSC es el **layout canónico**. Todo el código del repo sigue con direccion
    - Mouse (límites de pitch), zoom, HUD y textos de pickups. Usan muchos datos traducidos.
 3. **Tests de C: compilan (cross-compile), pero no se corrieron.** En Windows hay que correrlos con `ctest`, en especial `tests/eeprom` (cubre `RECOMP_XBOX_LANGUAGE`) y los fixtures que extraen código de `recomp_manual.c`.
 4. **`sub_00240137`**, caso especial de `generate.py`: no aparece en la salida PAL. Probablemente venga del feedback de icall local del autor.
-5. **Datos de BSS** (`0x2F3BD4`, `0x2F3A38`…): se asumió `+0x20`. Solo se puede confirmar en ejecución.
+5. **Direcciones traducidas: verificadas estáticamente.** `verify_release.py` contra el XBE PAL da 73/73 ok, BSS incluido. Por ejemplo:
+   - El vertex decode PAL (`0x205A0`) usa exactamente `0x295DA0`, `0x295DA4` y `0x295DAC`.
+   - La fórmula del zoom en `0x1BD456` usa `[0x295C94]` (1.0) y `[0x295DD8]` (k) sobre `[cámara+0x8C]+0x2A4`.
+   - Valores: `±70.0`, `0.01` y `1.0`/`1.3333`.
+   - Las 15 direcciones de código caen después de un `call` o en un inicio de función.
+   - Falta igual confirmarlo jugando.
 6. **Mejoras gráficas**, después de que el juego corra.
 
 ## Herramientas útiles
