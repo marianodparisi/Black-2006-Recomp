@@ -108,6 +108,40 @@ static void test_sustained_fire_survives_gameplay_gap(void)
     pc_input_test_reset();
 }
 
+/* A frame finished before the next camera update ends gameplay for keys and
+ * buttons, but must neither release the pointer nor discard the mouse motion
+ * gathered meanwhile, while the last camera update is recent. A real gap
+ * (here 300 ms) still releases both. */
+static void test_look_survives_camera_gap(void)
+{
+    double yaw, pitch;
+    _putenv_s("RECOMP_BLACK_INPUT_MODE", "auto");
+    _putenv_s("RECOMP_INPUT_TRACE", "");
+    _putenv_s("RECOMP_INPUT_SCRIPT", "");
+    _putenv_s("RECOMP_PAD_SCRIPT", "");
+    pc_input_test_reset();
+    pc_input_test_set_time(100000);
+    pc_input_gameplay_tick();
+    pc_input_frame_complete();
+    CHECK(pc_input_capture_wanted());
+    pc_input_capture_changed(1);
+    pc_input_mouse_motion(100, 50);
+    pc_input_frame_complete();             /* no camera update in this frame */
+    CHECK(!pc_input_gameplay_active());    /* keys and buttons keep the original boundary */
+    CHECK(pc_input_capture_wanted());      /* the pointer stays captured */
+    pc_input_test_set_time(100020);
+    pc_input_gameplay_tick();              /* control is back 20 ms later */
+    CHECK(pc_input_consume_look(&yaw, &pitch) && yaw != 0.0 && pitch != 0.0);
+    pc_input_mouse_motion(100, 50);
+    pc_input_test_set_time(100300);
+    pc_input_frame_complete();
+    pc_input_frame_complete();             /* 300 ms without a camera update */
+    CHECK(!pc_input_capture_wanted());
+    pc_input_gameplay_tick();
+    CHECK(!pc_input_consume_look(&yaw, &pitch)); /* stale motion is still discarded */
+    pc_input_test_reset();
+}
+
 static void fire_test_reset(void)
 {
     _putenv_s("RECOMP_BLACK_INPUT_MODE", "auto");
@@ -1141,6 +1175,7 @@ int main(void)
     snprintf(ini_path + n, 32, "pc_video_test_%lu.ini", (unsigned long)GetCurrentProcessId());
     test_model();
     test_sustained_fire_survives_gameplay_gap();
+    test_look_survives_camera_gap();
     test_fire_ack_generation_guards();
     test_ambient_occlusion();
     test_environment_and_file();

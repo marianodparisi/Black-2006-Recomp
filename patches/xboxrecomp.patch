@@ -4066,7 +4066,7 @@ new file mode 100644
 index 0000000..11631b9
 --- /dev/null
 +++ b/src/input/pc_input.c
-@@ -0,0 +1,1515 @@
+@@ -0,0 +1,1530 @@
 +/*
 + * pc_input.c -- native keyboard and mouse for BLACK. See pc_input.h for the design.
 + *
@@ -4111,7 +4111,7 @@ index 0000000..11631b9
 +#define PC_WHEEL_MS 110
 +#define PC_PULSE_MS 150
 +#define PC_GAMEPLAY_MS 400              /* startup fallback and evidence for a new movement hold in a frame gap */
-+#define PC_GAMEPLAY_GAP_MS 150          /* frames finished without a camera update that still count as gameplay */
++#define PC_LOOK_GAP_MS 150              /* camera-update gap that keeps the pointer and mouse motion (see below) */
 +#define PC_PENDING_MS 5000             /* safety expiry for a stalled/disconnected native consumer */
 +#define PC_PENDING_MAX 4               /* bounded distinct presses awaiting native samples */
 +#define PC_NATIVE_SAMPLE_MAX 4         /* bounded snapshots; stale completions cannot acknowledge new input */
@@ -4662,15 +4662,33 @@ index 0000000..11631b9
 +    return gameplay_hold_source(source);
 +}
 +
++/* Below full speed the renderer often completes a frame before the next camera
++ * update, which ends gameplay for that frame. For keys and buttons that is the
++ * intended boundary, but releasing the pointer there (and discarding the mouse
++ * motion gathered meanwhile) made it flash and look choppy, worst on diagonals.
++ * The pointer and the motion survive while the last camera update is recent and
++ * nothing (pause, movie, focus loss) has ended gameplay for real. */
++static int look_gap_recent(uint64_t now)
++{
++    const uint64_t tick = (uint64_t)s_gameplay_tick;
++    if (!s_frame_authority || s_focus_pause_guard || !tick || now < tick || now - tick > PC_LOOK_GAP_MS) return 0;
++    if (movie_active() || (s_gameplay_blocked_query && s_gameplay_blocked_query())) return 0;
++    return 1;
++}
++
 +void pc_input_gameplay_tick(void)
 +{
 +    uint64_t now = now_ms();
 +    int was = pc_input_gameplay_active();
++    const int look_gap = look_gap_recent(now);
 +    if (!s_frame_authority && s_focused) s_focus_pause_guard = 0;
 +    if (!was && !s_focus_pause_guard) {
-+        /* control has just come back (or started): stale movement must not become a turn */
-+        InterlockedExchange(&s_dx, 0);
-+        InterlockedExchange(&s_dy, 0);
++        /* control has just come back (or started): stale movement must not become a turn.
++         * After only a short camera-update gap the motion is current: keep it. */
++        if (!look_gap) {
++            InterlockedExchange(&s_dx, 0);
++            InterlockedExchange(&s_dy, 0);
++        }
 +        trace("gameplay active");
 +        if (s_trace_level >= 2) {
 +            char line[512];
@@ -4697,19 +4715,15 @@ index 0000000..11631b9
 +{
 +    const int seen = InterlockedExchange(&s_gameplay_seen, 0) != 0;
 +    const int blocked = movie_active() || (s_gameplay_blocked_query && s_gameplay_blocked_query());
-+    const uint64_t tick = (uint64_t)s_gameplay_tick, now = now_ms();
-+    /* Below full speed the renderer often completes a frame before the next
-+     * camera update. A gap that short is still gameplay: ending it would
-+     * release the pointer and discard the mouse motion gathered meanwhile.
-+     * Pause and movies stay immediate; focus loss clears the tick. */
-+    const int recent = tick && now >= tick && now - tick <= PC_GAMEPLAY_GAP_MS;
 +    pc_input_init();
 +    InterlockedExchange(&s_frame_authority, 1);
 +    if (blocked) InterlockedExchange64(&s_gameplay_tick, 0);
-+    if ((!seen && !recent) || blocked) {
++    if (!seen || blocked) {
 +        unsigned id;
 +        InterlockedExchange(&s_gameplay_active, 0);
-+        InterlockedExchange(&s_dx, 0); InterlockedExchange(&s_dy, 0);
++        if (blocked || !look_gap_recent(now_ms())) {
++            InterlockedExchange(&s_dx, 0); InterlockedExchange(&s_dy, 0);
++        }
 +        AcquireSRWLockExclusive(&s_pending_lock);
 +        for (id = 0; id < SRC_COUNT; ++id) {
 +            unsigned read, write = 0;
@@ -4915,7 +4929,8 @@ index 0000000..11631b9
 +int pc_input_capture_wanted(void)
 +{
 +    pc_input_init();
-+    return !s_script_background && s_focused && kbm_enabled() && pc_input_gameplay_active() && !movie_active();
++    return !s_script_background && s_focused && kbm_enabled() &&
++           (pc_input_gameplay_active() || look_gap_recent(now_ms())) && !movie_active();
 +}
 +
 +int pc_input_cursor_hidden_wanted(void)
