@@ -5902,7 +5902,7 @@ index e515377..89ce24e 100644
  /* Older spellings kept so existing call sites still build. */
  #define XC_PARENTAL_CONTROL       XC_P_CONTROL_GAMES
 diff --git a/src/kernel/kernel_bridge.c b/src/kernel/kernel_bridge.c
-index 5b56513..f88c7c5 100644
+index 5b56513..c1d8376 100644
 --- a/src/kernel/kernel_bridge.c
 +++ b/src/kernel/kernel_bridge.c
 @@ -28,6 +28,7 @@
@@ -6482,7 +6482,7 @@ index 5b56513..f88c7c5 100644
   */
  #define XBOX_NV2A_REG_BASE     0xFD000000u
  #define NV2A_PMC_INTR_0        0x00000100u
-@@ -1973,25 +2312,103 @@ static int kernel_raise_interrupt(uint32_t vector)
+@@ -1973,25 +2312,167 @@ static int kernel_raise_interrupt(uint32_t vector)
  #define NV2A_PCRTC_INTR_VBLANK (1u << 0)
  #define NV2A_VECTOR            3u
 
@@ -6556,6 +6556,46 @@ index 5b56513..f88c7c5 100644
 +    return left < (LONGLONG)limit ? (DWORD)left : limit;
 +}
 +
++/* RECOMP_VBLANK_KEEP_GRID=1: missed vblanks are owed, not dropped (see
++ * kernel_vblank_tick). RECOMP_VBLANK_STATS=1 prints, every five seconds,
++ * how many vblanks were delivered, how many came late to repay a stall,
++ * how many were dropped and how often the grid restarted. */
++static int s_vblank_keep_grid = -1, s_vblank_stats;
++static LONGLONG s_vblank_grid, s_vstat_since;
++static unsigned s_vstat_delivered, s_vstat_owed, s_vstat_dropped, s_vstat_restarts;
++
++static void vblank_keep_grid_init(void)
++{
++    const char *e, *s;
++    if (s_vblank_keep_grid >= 0)
++        return;
++    e = getenv("RECOMP_VBLANK_KEEP_GRID");
++    s = getenv("RECOMP_VBLANK_STATS");
++    s_vblank_keep_grid = e && *e && *e != '0';
++    s_vblank_stats = s && *s && *s != '0';
++    if (s_vblank_keep_grid)
++        fprintf(stderr, "[VBLANK] keeping the grid: vblanks missed in a stall are delivered late, not dropped\n");
++}
++
++static void kernel_vblank_stats(LONGLONG now)
++{
++    LARGE_INTEGER f;
++    if (!s_vblank_stats)
++        return;
++    if (!s_vstat_since) {
++        s_vstat_since = now;
++        return;
++    }
++    QueryPerformanceFrequency(&f);
++    if (now - s_vstat_since < 5 * f.QuadPart)
++        return;
++    fprintf(stderr, "[VBLANK] %.2f/s delivered (%u late to repay a stall), %u dropped, %u grid restarts\n",
++            (double)s_vstat_delivered * (double)f.QuadPart / (double)(now - s_vstat_since),
++            s_vstat_owed, s_vstat_dropped, s_vstat_restarts);
++    s_vstat_delivered = s_vstat_owed = s_vstat_dropped = s_vstat_restarts = 0;
++    s_vstat_since = now;
++}
++
  static void kernel_vblank_tick(void)
  {
 -    static int enabled = -1;
@@ -6572,14 +6612,38 @@ index 5b56513..f88c7c5 100644
 -    now = (long long)GetTickCount64();
 -    if (now < next_ms)
 +    QueryPerformanceCounter(&now);
++    vblank_keep_grid_init();
++    kernel_vblank_stats(now.QuadPart);
 +    if (now.QuadPart < s_vblank_next)
          return;
 -    next_ms = now + 16;                       /* ~60 Hz */
-+    /* The next one on the 60 Hz grid; after a stall, restart the grid from
-+     * now rather than delivering the missed ones in a burst. */
-+    s_vblank_next += s_vblank_period;
-+    if (s_vblank_next <= now.QuadPart)
-+        s_vblank_next = now.QuadPart + s_vblank_period;
++    ++s_vstat_delivered;
++    if (s_vblank_keep_grid) {
++        /* Keep the grid through a short stall of this thread (a GPU lock
++         * held for a while, a slow DPC): the vblanks it missed follow at a
++         * quarter period apart, so a title that steps its world once per
++         * vblank-paced flip stays at real time. A stall of more than four
++         * periods is a real interruption and restarts the grid as below. */
++        s_vblank_grid += s_vblank_period;
++        if (s_vblank_grid <= now.QuadPart - 4 * s_vblank_period) {
++            s_vblank_grid = now.QuadPart + s_vblank_period;
++            ++s_vstat_restarts;
++        }
++        s_vblank_next = s_vblank_grid;
++        if (s_vblank_next <= now.QuadPart) {
++            s_vblank_next = now.QuadPart + s_vblank_period / 4;
++            ++s_vstat_owed;
++        }
++    } else {
++        /* The next one on the 60 Hz grid; after a stall, restart the grid from
++         * now rather than delivering the missed ones in a burst. */
++        s_vblank_next += s_vblank_period;
++        if (s_vblank_next <= now.QuadPart) {
++            s_vstat_dropped += (unsigned)((now.QuadPart - s_vblank_next) / s_vblank_period) + 1u;
++            s_vblank_next = now.QuadPart + s_vblank_period;
++            ++s_vstat_restarts;
++        }
++    }
 
      if (!xbox_GetConnectedInterrupt(NV2A_VECTOR))
          return;
@@ -6595,7 +6659,7 @@ index 5b56513..f88c7c5 100644
      BRIDGE_MEM32(XBOX_NV2A_REG_BASE + NV2A_PCRTC_INTR_0) |= NV2A_PCRTC_INTR_VBLANK;
      BRIDGE_MEM32(XBOX_NV2A_REG_BASE + NV2A_PMC_INTR_0)   |= NV2A_PMC_INTR_PCRTC;
 
-@@ -2006,16 +2423,77 @@ static void kernel_vblank_tick(void)
+@@ -2006,16 +2487,77 @@ static void kernel_vblank_tick(void)
      }
  }
 
@@ -6677,7 +6741,7 @@ index 5b56513..f88c7c5 100644
  }
 
  /* ── KeInitializeDpc (ordinal 107) ────────────────────────
-@@ -2044,18 +2522,20 @@ static void bridge_KeInitializeDpc(void)
+@@ -2044,18 +2586,20 @@ static void bridge_KeInitializeDpc(void)
  /* ── NV2A interrupt plumbing (ordinals 44, 98, 109) ───────
   *
   * The D3D8 library linked into a title installs an ISR for the GPU's vblank /
@@ -6704,7 +6768,7 @@ index 5b56513..f88c7c5 100644
 
  /* ULONG HalGetInterruptVector(ULONG BusInterruptLevel, PKIRQL Irql) */
  static void bridge_HalGetInterruptVector(void)
-@@ -2098,7 +2578,6 @@ static void bridge_KeInitializeInterrupt(void)
+@@ -2098,7 +2642,6 @@ static void bridge_KeInitializeInterrupt(void)
   * A small fixed table rather than a list: an Xbox has 26 interrupt vectors and
   * a title connects a handful, so the whole thing is smaller than the comment.
   */
@@ -6712,7 +6776,7 @@ index 5b56513..f88c7c5 100644
  static uint32_t g_connected_isr[XBOX_MAX_VECTORS];   /* KINTERRUPT guest VA */
 
  /* BOOLEAN KeConnectInterrupt(PKINTERRUPT Interrupt) */
-@@ -2115,6 +2594,9 @@ static void bridge_KeConnectInterrupt(void)
+@@ -2115,6 +2658,9 @@ static void bridge_KeConnectInterrupt(void)
                      vector, BRIDGE_MEM32(interrupt_va + 0),
                      BRIDGE_MEM32(interrupt_va + 4));
              fflush(stderr);
@@ -6722,7 +6786,7 @@ index 5b56513..f88c7c5 100644
          }
      }
      g_eax = 1;  /* connected -- see the note above */
-@@ -2127,6 +2609,46 @@ uint32_t xbox_GetConnectedInterrupt(uint32_t vector)
+@@ -2127,6 +2673,46 @@ uint32_t xbox_GetConnectedInterrupt(uint32_t vector)
      return (vector < XBOX_MAX_VECTORS) ? g_connected_isr[vector] : 0;
  }
 
@@ -6769,7 +6833,7 @@ index 5b56513..f88c7c5 100644
  /* ── MmClaimGpuInstanceMemory (ordinal 168) ───────────────
   * PVOID MmClaimGpuInstanceMemory(SIZE_T NumberOfBytes, SIZE_T *Padding)
   *
-@@ -2236,11 +2758,16 @@ static XboxTimer g_timers[XBOX_MAX_TIMERS];
+@@ -2236,11 +2822,16 @@ static XboxTimer g_timers[XBOX_MAX_TIMERS];
  static CRITICAL_SECTION g_timer_lock;
  static int g_timer_started;
 
@@ -6786,7 +6850,7 @@ index 5b56513..f88c7c5 100644
      if (slot < 0) {
          fprintf(stderr, "  [KERNEL] timer thread has no worker stack; "
                          "timer DPCs will not run\n");
-@@ -2265,11 +2792,77 @@ static DWORD WINAPI kernel_timer_thread(LPVOID unused)
+@@ -2265,11 +2856,77 @@ static DWORD WINAPI kernel_timer_thread(LPVOID unused)
 
      for (;;) {
          long long now;
@@ -6869,7 +6933,7 @@ index 5b56513..f88c7c5 100644
          now = (long long)GetTickCount64();
 
          for (i = 0; i < XBOX_MAX_TIMERS; i++) {
-@@ -2288,23 +2881,41 @@ static DWORD WINAPI kernel_timer_thread(LPVOID unused)
+@@ -2288,23 +2945,41 @@ static DWORD WINAPI kernel_timer_thread(LPVOID unused)
                  g_timers[i].timer_va = 0;      /* one-shot, done */
              LeaveCriticalSection(&g_timer_lock);
 
@@ -6922,7 +6986,7 @@ index 5b56513..f88c7c5 100644
  /* Shared by KeSetTimer and KeSetTimerEx; period is 0 for the former. */
  static void kernel_set_timer(uint32_t timer_va, long long due_100ns,
                               long period_ms, uint32_t dpc_va)
-@@ -2313,11 +2924,7 @@ static void kernel_set_timer(uint32_t timer_va, long long due_100ns,
+@@ -2313,11 +2988,7 @@ static void kernel_set_timer(uint32_t timer_va, long long due_100ns,
      int i, free_slot = -1;
      uint32_t was_set = 0;
 
@@ -6935,7 +6999,7 @@ index 5b56513..f88c7c5 100644
 
      EnterCriticalSection(&g_timer_lock);
      for (i = 0; i < XBOX_MAX_TIMERS; i++) {
-@@ -2614,6 +3221,70 @@ static int bridge_is_cdrom_device(const char *path)
+@@ -2614,6 +3285,70 @@ static int bridge_is_cdrom_device(const char *path)
      return _stricmp(path, "\\Device\\CdRom0") == 0;
  }
 
@@ -7006,7 +7070,7 @@ index 5b56513..f88c7c5 100644
  /* Open a file by delegating to the ported xbox_NtCreateFile kernel HLE. */
  static NTSTATUS bridge_create_file_impl(
      uint32_t handle_va, ACCESS_MASK access, uint32_t obj_attrs_va,
-@@ -2632,6 +3303,14 @@ static NTSTATUS bridge_create_file_impl(
+@@ -2632,6 +3367,14 @@ static NTSTATUS bridge_create_file_impl(
          return STATUS_OBJECT_PATH_NOT_FOUND;
      }
 
@@ -7021,7 +7085,7 @@ index 5b56513..f88c7c5 100644
      if (bridge_is_cdrom_device(name.Buffer)) {
          fprintf(stderr, "  [FILE] %s -> synthetic DVD device handle\n",
                  name.Buffer);
-@@ -3068,6 +3747,16 @@ static void bridge_NtReadFile(void)
+@@ -3068,6 +3811,16 @@ static void bridge_NtReadFile(void)
                      got > 2 ? p[2] : 0, got > 3 ? p[3] : 0);
          fflush(stderr);
      }
@@ -7038,7 +7102,7 @@ index 5b56513..f88c7c5 100644
      bridge_write_iostatus(iostatus, ios.Status, (uint32_t)ios.Information);
      bridge_complete_file_io(STACK_ARG(1), STACK_ARG(2), STACK_ARG(3),
                              iostatus);
-@@ -6576,6 +7265,10 @@ static void bridge_KeResetEvent(void)
+@@ -6576,6 +7329,10 @@ static void bridge_KeResetEvent(void)
      HANDLE h;
 
      h = ke_shadow_lookup(guest_va);
@@ -7049,7 +7113,7 @@ index 5b56513..f88c7c5 100644
      if (!h)
          h = XBOX_TO_NATIVE(guest_va);
      if (h)
-@@ -6753,7 +7446,9 @@ static void bridge_KeLeaveCriticalRegion(void)
+@@ -6753,7 +7510,9 @@ static void bridge_KeLeaveCriticalRegion(void)
  /* --- KeRaiseIrqlToSynchLevel (ordinal 130, 0 args = 0 bytes) --- */
  static void bridge_KeRaiseIrqlToSynchLevel(void)
  {
@@ -7060,7 +7124,7 @@ index 5b56513..f88c7c5 100644
  }
 
  /* --- KeRemoveByKeyDeviceQueue (ordinal 133, 2 args = 8 bytes) --- */
-@@ -6808,6 +7503,11 @@ static void bridge_KeSetEventBoostPriority(void)
+@@ -6808,6 +7567,11 @@ static void bridge_KeSetEventBoostPriority(void)
      (void)increment;
 
      h = ke_shadow_lookup(guest_va);
@@ -7072,7 +7136,7 @@ index 5b56513..f88c7c5 100644
      if (!h)
          h = XBOX_TO_NATIVE(guest_va);
      if (h)
-@@ -6853,11 +7553,11 @@ static void bridge_KiUnlockDispatcherDatabase(void)
+@@ -6853,11 +7617,11 @@ static void bridge_KiUnlockDispatcherDatabase(void)
  }
 
  /* --- KeGetCurrentIrql (ordinal 103, 0 args = 0 bytes)
@@ -7087,7 +7151,7 @@ index 5b56513..f88c7c5 100644
  }
 
  /* --- KeGetCurrentThread (ordinal 104, 0 args = 0 bytes) --- */
-@@ -7260,6 +7960,8 @@ static void bridge_ObReferenceObjectByPointer(void)
+@@ -7260,6 +8024,8 @@ static void bridge_ObReferenceObjectByPointer(void)
  static void bridge_PsCreateSystemThread(void)
  {
      uint32_t xbox_handle_ptr = STACK_ARG(0);
@@ -7096,7 +7160,7 @@ index 5b56513..f88c7c5 100644
      uint32_t start_context1  = STACK_ARG(4);
      uint32_t start_context2  = STACK_ARG(5);
      uint32_t start_routine   = STACK_ARG(6);
-@@ -7271,6 +7973,9 @@ static void bridge_PsCreateSystemThread(void)
+@@ -7271,6 +8037,9 @@ static void bridge_PsCreateSystemThread(void)
      /* Fake handle until the worker path can write a real one. */
      if (xbox_handle_ptr)
          BRIDGE_MEM32(xbox_handle_ptr) = 0xBEEF0002;
@@ -7106,7 +7170,7 @@ index 5b56513..f88c7c5 100644
 
      if (start_routine) {
          recomp_func_t fn = recomp_lookup(start_routine);
-@@ -7297,7 +8002,8 @@ static void bridge_PsCreateSystemThread(void)
+@@ -7297,7 +8066,8 @@ static void bridge_PsCreateSystemThread(void)
                      bridge_run_thread_inline(fn, start_context1, start_context2);
                  } else {
                      HANDLE th = bridge_spawn_thread(fn, start_context1,
@@ -7116,7 +7180,7 @@ index 5b56513..f88c7c5 100644
                      if (xbox_handle_ptr && th)
                          bridge_write_handle(xbox_handle_ptr, th);
                  }
-@@ -8811,6 +9517,221 @@ static void kernel_watch_arm_once(void)
+@@ -8811,6 +9581,221 @@ static void kernel_watch_arm_once(void)
  /* Current dispatching slot */
  static RECOMP_TLS int g_kernel_dispatch_slot = -1;
 
@@ -7338,7 +7402,7 @@ index 5b56513..f88c7c5 100644
  static void kernel_thunk_dispatch(void)
  {
      int slot = g_kernel_dispatch_slot;
-@@ -8885,6 +9806,28 @@ static void kernel_thunk_dispatch(void)
+@@ -8885,6 +9870,28 @@ static void kernel_thunk_dispatch(void)
       * section above all -- can then say which guest call site is holding the
       * lock, which is the one fact a deadlock report otherwise lacks. */
      g_xbox_kernel_caller = g_esp ? BRIDGE_MEM32(g_esp) : 0;
@@ -7367,7 +7431,7 @@ index 5b56513..f88c7c5 100644
      g_esp += 4;
 
      /* Name the bridge that corrupts a watched dword.
-@@ -8918,7 +9861,33 @@ static void kernel_thunk_dispatch(void)
+@@ -8918,7 +9925,33 @@ static void kernel_thunk_dispatch(void)
      }
 
      if (bridge) {
@@ -7401,7 +7465,7 @@ index 5b56513..f88c7c5 100644
      } else {
          /* No specific bridge - return 0. Warn once per ordinal rather than
           * gating on g_kernel_call_count: a missing bridge is rare and is
-@@ -8947,6 +9916,9 @@ static void kernel_thunk_dispatch(void)
+@@ -8947,6 +9980,9 @@ static void kernel_thunk_dispatch(void)
          g_eax = 0;
      }
 
@@ -7411,7 +7475,7 @@ index 5b56513..f88c7c5 100644
      /* Clean stdcall args from the simulated stack.
       * On real x86, stdcall callee does "ret N" to pop the return address
       * and N bytes of arguments. We already popped the dummy return address
-@@ -9081,7 +10053,8 @@ void xbox_kernel_bridge_init(void)
+@@ -9081,7 +10117,8 @@ void xbox_kernel_bridge_init(void)
          uint32_t va = g_thunk_table_base + i * 4;
          uint32_t current = BRIDGE_MEM32(va);
 
@@ -7421,7 +7485,7 @@ index 5b56513..f88c7c5 100644
              /* Read the actual ordinal from Xbox memory, then translate it into
               * the kernel's canonical ordinal space. Identity unless the title
               * set a remap (a different XDK). Every routing decision below --
-@@ -9154,9 +10127,17 @@ void xbox_kernel_bridge_init(void)
+@@ -9154,9 +10191,17 @@ void xbox_kernel_bridge_init(void)
              uint32_t current = BRIDGE_MEM32(va);
              int slot;
 

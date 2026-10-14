@@ -858,6 +858,8 @@ namespace BlackXboxLauncher
             info.EnvironmentVariables["RECOMP_APU_DSP_ACK"] = "0x83218810";
             info.EnvironmentVariables["RECOMP_NV2A_KELVIN"] = "1";
             info.EnvironmentVariables["RECOMP_VBLANK"] = "1";
+            // Owe the vblanks a stalled timer thread misses instead of dropping them: the coupled clock keeps real time.
+            info.EnvironmentVariables["RECOMP_VBLANK_KEEP_GRID"] = "1";
             info.EnvironmentVariables["RECOMP_USB"] = "1";
             info.EnvironmentVariables["RECOMP_FB_WINDOW"] = "1";
             info.EnvironmentVariables["RECOMP_KELVIN_THREADS"] = options.Threads.ToString(CultureInfo.InvariantCulture);
