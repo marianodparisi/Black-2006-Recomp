@@ -119,13 +119,16 @@ El NTSC es el **layout canónico**. Todo el código del repo sigue con direccion
 
 - Compila y corre en la PC del usuario (i5-12400F, RTX 2060 Super) con el XBE PAL. Build incremental: `cmake --build build-vs2022 --config Release --target black_xbox_recomp` (segundos); `setup.ps1` regenera todo desde el XBE.
 - El launcher borra las variables `RECOMP_*`. Para diagnosticar, correr el `.exe` directo con el entorno de `reports\launcher-*\launch.json` más las variables de traza.
-- **Mouse:** `pc_input_frame_complete` daba por terminado el gameplay en cada frame sin actualización de cámara. Soltaba el puntero (unas 200 veces por partida) y tiraba el movimiento. Ahora tolera huecos de hasta 150 ms (`PC_GAMEPLAY_GAP_MS`).
+- **Mouse:** `pc_input_frame_complete` da por terminado el gameplay en cada frame sin actualización de cámara. Para teclas y botones ese límite se mantiene: lo cubren los tests de `ambient_occlusion/test_video.c`. Pero también soltaba el puntero (unas 200 veces por partida) y tiraba el movimiento del mouse. Ahora `look_gap_recent` (`PC_LOOK_GAP_MS`, 150 ms) mantiene la captura y el movimiento mientras la última actualización de cámara sea reciente. Test: `test_look_survives_camera_gap`.
+  - Una primera versión cambiaba el límite del gameplay entero y rompía `ao-video` (retenciones mínimas de toques). Se reemplazó por esta.
 - **Velocidad:** con `RECOMP_BLACK_60HZ` el mundo avanza 1/60 s por vuelta del loop, y el tiempo del juego es `ticks × paso` (`0x2F4368` canónico; los timers calculan `+0x20` desde los ticks). Cambiar el paso en vivo haría saltar todos los timers. Para ir a tiempo real el loop tiene que dar 60 vueltas por segundo.
   - El reloj de vblank emulado perdía vblanks cuando el hilo del timer se atrasaba más de un período (reiniciaba la grilla): ~57.6/s. `RECOMP_VBLANK_KEEP_GRID=1` (el launcher lo activa) los entrega tarde en vez de descartarlos. Medido con `RECOMP_BLACK_SIMLOG=300`: mediana de 0.91x a 0.97x de tiempo real.
   - Probado y descartado: demorar el vblank hasta que el frame llegue a su `FLIP_STALL` (catch-up de flips). No mejoró: 0.89x.
   - En escenas pesadas sigue a ~0.8x: el frame cuesta más de 16.7 ms. Ahí hace falta rendimiento, o correr a 30 Hz.
   - `RECOMP_VBLANK_STATS=1` imprime vblanks entregados, recuperados, perdidos y reinicios cada 5 s.
-- El fundido del desenfoque de recarga del juego dura 75 pasos (1.25 s a velocidad real). DoF en Off también lo apaga (`sub_001772E0`).
+- **Desenfoque de recarga y apuntado** (`sub_001772E0`, compuesto propio del juego): tiene su propia opción, Action blur (`action_blur=original|off` en `video.ini`, pestaña Graphics del launcher). Es independiente del motion blur y del DoF agregado. El fundido dura 75 pasos (1.25 s a velocidad real).
+- **Español oficial verificado:** con "Español (official)" el launcher pasa `RECOMP_XBOX_LANGUAGE=5` y el juego carga `MainSp.bin`. En inglés carga `MainUK.bin`.
+- Ojo al restaurar archivos con `Copy-Item`: conserva la fecha vieja y MSBuild no recompila. Hacer `touch` después.
 
 ## Pendiente
 
