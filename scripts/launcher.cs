@@ -262,8 +262,8 @@ namespace BlackXboxLauncher
         public bool DspTraceEnabled;
         // The window's client size. The picture the game renders is a separate setting, InternalHeight: a number of
         // lines (480p..2160p) whose width follows the camera aspect, scaled to the window.
-        public int OutputWidth = 1280;
-        public int OutputHeight = 960;
+        public int OutputWidth = 1600;
+        public int OutputHeight = 900;
         public int InternalHeight = 720;
         // Picture effects the GPU renderer does itself. AntiAliasing: off, fxaa (filters the finished scene, not the HUD) or
         // ssaa (renders at twice the width and height and averages down). Anisotropy is the filtering level, 1 being off.
@@ -281,7 +281,7 @@ namespace BlackXboxLauncher
         public string PresentFilter = "linear";
         public bool VSync = true;
         public int FpsLimit;
-        public string CameraAspect = "original";
+        public string CameraAspect = "16:9";
         // Zero preserves the game's original camera and zoom. Custom values are
         // the vertical field of view in degrees, independent of aspect ratio.
         public double VerticalFov;
