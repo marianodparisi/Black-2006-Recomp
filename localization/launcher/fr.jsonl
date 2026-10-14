@@ -355,3 +355,5 @@
 {"id": "1062", "text": "Emplacement "}
 {"id": "1063", "text": "Utiliser le réglage du profil/jeu"}
 {"id": "1064", "text": "sauvegardes valides du profil disponibles."}
+{"id": "1065", "text": "Flou d'action", "review_status": "editorial-revised-needs-native-review"}
+{"id": "1066", "text": "Original conserve le flou de BLACK lors du rechargement et de la visée. Désactivé le supprime ; le flou de mouvement et la profondeur de champ sont des réglages distincts.", "review_status": "editorial-revised-needs-native-review"}

@@ -467,6 +467,7 @@ static int same_settings(const PcVideoSettings *a, const PcVideoSettings *b)
     return a->internal_height == b->internal_height && a->window_width == b->window_width && a->window_height == b->window_height &&
            a->borderless == b->borderless && a->scale == b->scale && a->nearest == b->nearest && a->vsync == b->vsync &&
            a->fps_limit == b->fps_limit && a->aspect == b->aspect && a->fov == b->fov && a->motion_blur_off == b->motion_blur_off &&
+           a->action_blur_off == b->action_blur_off &&
            a->aa == b->aa && a->af == b->af && a->dof == b->dof && a->sharpen == b->sharpen &&
            a->ao_method == b->ao_method && a->ao_quality == b->ao_quality &&
            a->render_override_w == b->render_override_w && a->render_override_h == b->render_override_h;
@@ -554,11 +555,13 @@ static void test_model(void)
     pc_video_defaults(&s);
     s.internal_height = 1080; s.window_width = 3440; s.window_height = 1440; s.borderless = 1; s.scale = PCV_SCALE_INTEGER;
     s.nearest = 1; s.vsync = 0; s.fps_limit = 144; s.aspect = PCV_ASPECT_21_9; s.fov = 90; s.motion_blur_off = 1;
+    s.action_blur_off = 1;
     s.aa = PCV_AA_SSAA; s.af = 4; s.dof = PCV_STEP_MEDIUM; s.sharpen = PCV_STEP_HIGH;
     CHECK(pc_video_format(&s, text, sizeof(text)) > 0);
     pc_video_defaults(&t);
     CHECK(strstr(text, "aa=ssaa\n") && strstr(text, "af=4\n") && strstr(text, "dof=medium\n") && strstr(text, "sharpen=high\n"));
-    CHECK(pc_video_parse(text, &t) == 17);
+    CHECK(strstr(text, "motion_blur=off\n") && strstr(text, "action_blur=off\n"));
+    CHECK(pc_video_parse(text, &t) == 18);
     CHECK(same_settings(&s, &t));
     pc_video_defaults(&t);
     CHECK(pc_video_parse("[video]\r\n; comment\r\ninternal_height=999\r\nwindow_width=1600\r\nbogus=1\r\nfov=500\r\nfov=72.5\r\n"
@@ -585,7 +588,7 @@ static void test_ambient_occlusion(void)
             CHECK(s.ao_method == method && s.ao_quality == quality);
             CHECK(pc_video_format(&s, text, sizeof(text)) < sizeof(text));
             pc_video_defaults(&t);
-            CHECK(pc_video_parse(text, &t) == 17 && same_settings(&s, &t));
+            CHECK(pc_video_parse(text, &t) == 18 && same_settings(&s, &t));
         }
     }
     CHECK(pc_video_parse("ao_method=GTAO\nao_quality=ULTRA\n", &s) == 2);

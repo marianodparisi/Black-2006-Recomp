@@ -355,7 +355,9 @@
     "Silver weapons": "Silver weapons",
     "Slot ": "Slot ",
     "Use Profile/game setting": "Use Profile/game setting",
-    "validated Profile backups available.": "validated Profile backups available."
+    "validated Profile backups available.": "validated Profile backups available.",
+    "Action blur": "Desfoque de ação",
+    "Original keeps BLACK's own blur while reloading and aiming. Off removes it; motion blur and depth of field are separate settings.": "Original mantém o desfoque de BLACK ao recarregar e mirar. Desativado o remove; desfoque de movimento e profundidade de campo são ajustes separados."
   },
   "es": {
     "Display": "Pantalla",
@@ -713,7 +715,9 @@
     "Silver weapons": "Armas plateadas",
     "Slot ": "Ranura ",
     "Use Profile/game setting": "Usar ajuste del perfil/juego",
-    "validated Profile backups available.": "copias válidas del perfil disponibles."
+    "validated Profile backups available.": "copias válidas del perfil disponibles.",
+    "Action blur": "Desenfoque de acción",
+    "Original keeps BLACK's own blur while reloading and aiming. Off removes it; motion blur and depth of field are separate settings.": "Original mantiene el desenfoque de BLACK al recargar y apuntar. Desactivado lo quita; el desenfoque de movimiento y la profundidad de campo son opciones aparte."
   },
   "fr": {
     "Display": "Affichage",
@@ -1071,7 +1075,9 @@
     "Silver weapons": "Armes argentées",
     "Slot ": "Emplacement ",
     "Use Profile/game setting": "Utiliser le réglage du profil/jeu",
-    "validated Profile backups available.": "sauvegardes valides du profil disponibles."
+    "validated Profile backups available.": "sauvegardes valides du profil disponibles.",
+    "Action blur": "Flou d'action",
+    "Original keeps BLACK's own blur while reloading and aiming. Off removes it; motion blur and depth of field are separate settings.": "Original conserve le flou de BLACK lors du rechargement et de la visée. Désactivé le supprime ; le flou de mouvement et la profondeur de champ sont des réglages distincts."
   },
   "de": {
     "Display": "Anzeige",
@@ -1429,7 +1435,9 @@
     "Silver weapons": "Silberwaffen",
     "Slot ": "Profilplatz ",
     "Use Profile/game setting": "Profil-/Spieleinstellung verwenden",
-    "validated Profile backups available.": "gültige Profilsicherungen verfügbar."
+    "validated Profile backups available.": "gültige Profilsicherungen verfügbar.",
+    "Action blur": "Aktionsunschärfe",
+    "Original keeps BLACK's own blur while reloading and aiming. Off removes it; motion blur and depth of field are separate settings.": "Original behält die Unschärfe von BLACK beim Nachladen und Zielen bei. Aus entfernt sie; Bewegungsunschärfe und Tiefenschärfe sind eigene Einstellungen."
   },
   "it": {
     "Display": "Schermo",
@@ -1787,6 +1795,8 @@
     "Silver weapons": "Armi argentate",
     "Slot ": "Slot ",
     "Use Profile/game setting": "Usa impostazione profilo/gioco",
-    "validated Profile backups available.": "backup validi del profilo disponibili."
+    "validated Profile backups available.": "backup validi del profilo disponibili.",
+    "Action blur": "Sfocatura d'azione",
+    "Original keeps BLACK's own blur while reloading and aiming. Off removes it; motion blur and depth of field are separate settings.": "Originale mantiene la sfocatura di BLACK durante la ricarica e la mira. Disattivato la rimuove; motion blur e profondità di campo sono impostazioni separate."
   }
 }

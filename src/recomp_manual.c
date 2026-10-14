@@ -1383,10 +1383,11 @@ void sub_00168A30(void)
 /* END BLACK_PC_MOTION_BLUR */
 
 /* BEGIN BLACK_PC_DEPTH_OF_FIELD
- * The retail action blur is a separate full-screen composite at 0x1772E0,
- * after its producer (0x15E260) and spatial glow preparation. The GPU DoF
- * setting previously controlled only the added depth-buffer pass, so reload
- * and aim could still blend the retail blurred texture with DoF Off.
+ * The retail action blur (reload and aim) is a separate full-screen
+ * composite at 0x1772E0, after its producer (0x15E260) and spatial glow
+ * preparation. It has its own setting, Action Blur (Original/Off, video.ini
+ * action_blur), independent of the camera-motion blur and of the GPU DoF
+ * setting, which only controls the added depth-buffer pass.
  * Mode zero takes the original no-blur branch before any graphics writes.
  * Mask it only during this draw; retain the producer, tint, timers and mode
  * so live re-enabling resumes the original effect. --exclude-manual keeps
@@ -1402,7 +1403,7 @@ void sub_001772E0(void)
     PcVideoSettings video;
     pc_video_get(&video);
     _mm_setcsr(caller_csr);
-    if (video.dof == PCV_STEP_OFF) GUEST32(effect + 0x34u) = 0u;
+    if (video.action_blur_off) GUEST32(effect + 0x34u) = 0u;
     sub_001772E0_gen();
     GUEST32(effect + 0x34u) = mode;
 }

@@ -355,3 +355,5 @@
 {"id": "1062", "text": "Ranura "}
 {"id": "1063", "text": "Usar ajuste del perfil/juego"}
 {"id": "1064", "text": "copias válidas del perfil disponibles."}
+{"id": "1065", "text": "Desenfoque de acción", "review_status": "editorial-revised-needs-native-review"}
+{"id": "1066", "text": "Original mantiene el desenfoque de BLACK al recargar y apuntar. Desactivado lo quita; el desenfoque de movimiento y la profundidad de campo son opciones aparte.", "review_status": "editorial-revised-needs-native-review"}

@@ -286,6 +286,8 @@ namespace BlackXboxLauncher
         // the vertical field of view in degrees, independent of aspect ratio.
         public double VerticalFov;
         public string MotionBlur = "original";
+        // BLACK's own reload/aim blur, separate from the camera-motion blur and the GPU depth of field.
+        public string ActionBlur = "original";
         // Native keyboard and mouse (pc_input.c reads these as RECOMP_BLACK_*). Bindings holds
         // only the actions the player changed: action name -> "Key,Key" (up to three, "None" for
         // unbound); an absent action keeps InputBindings.Actions' default.
@@ -351,6 +353,7 @@ namespace BlackXboxLauncher
             text.Append("aspect=").Append(CameraAspect).Append('\n');
             text.Append("fov=").Append(VerticalFov.ToString("R", CultureInfo.InvariantCulture)).Append('\n');
             text.Append("motion_blur=").Append(MotionBlur).Append('\n');
+            text.Append("action_blur=").Append(ActionBlur).Append('\n');
             text.Append("aa=").Append(AntiAliasing).Append('\n');
             text.Append("af=").Append(Anisotropy.ToString(CultureInfo.InvariantCulture)).Append('\n');
             text.Append("dof=").Append(DepthOfField).Append('\n');
@@ -409,6 +412,9 @@ namespace BlackXboxLauncher
                     case "motion_blur":
                         if (IsOneOf(value.ToLowerInvariant(), "original", "off")) { MotionBlur = value.ToLowerInvariant(); applied++; }
                         break;
+                    case "action_blur":
+                        if (IsOneOf(value.ToLowerInvariant(), "original", "off")) { ActionBlur = value.ToLowerInvariant(); applied++; }
+                        break;
                     case "aa":
                         if (IsOneOf(value.ToLowerInvariant(), "off", "fxaa", "ssaa")) { AntiAliasing = value.ToLowerInvariant(); applied++; }
                         break;
@@ -460,6 +466,7 @@ namespace BlackXboxLauncher
             if (!CameraAspectAvailable && CameraAspect != "original") throw new InvalidOperationException("Camera aspect changes are not supported by this build.");
             if (!IsFov(VerticalFov)) throw new ArgumentOutOfRangeException("VerticalFov");
             if (!IsOneOf(MotionBlur, "original", "off")) throw new ArgumentException("Invalid MotionBlur.");
+            if (!IsOneOf(ActionBlur, "original", "off")) throw new ArgumentException("Invalid ActionBlur.");
             if (!MotionBlurAvailable && MotionBlur != "original") throw new InvalidOperationException("Motion blur controls are not supported by this build.");
             if (!IsOneOf(InputMode, "auto", "keyboard_mouse", "controller")) throw new ArgumentException("Invalid InputMode.");
             if (!IsOneOf(PromptMode, "auto", "keyboard_mouse", "controller")) throw new ArgumentException("Invalid PromptMode.");
@@ -545,6 +552,7 @@ namespace BlackXboxLauncher
             if (!CameraAspectAvailable || !IsOneOf(settings.CameraAspect, "original", "4:3", "16:9", "21:9", "32:9")) settings.CameraAspect = defaults.CameraAspect;
             if (!IsFov(settings.VerticalFov)) settings.VerticalFov = defaults.VerticalFov;
             if (!MotionBlurAvailable || !IsOneOf(settings.MotionBlur, "original", "off")) settings.MotionBlur = defaults.MotionBlur;
+            if (!IsOneOf(settings.ActionBlur, "original", "off")) settings.ActionBlur = defaults.ActionBlur;
             if (!IsOneOf(settings.InputMode, "auto", "keyboard_mouse", "controller")) settings.InputMode = defaults.InputMode;
             if (!IsOneOf(settings.PromptMode, "auto", "keyboard_mouse", "controller")) settings.PromptMode = defaults.PromptMode;
             if (double.IsNaN(settings.MouseSensitivity) || double.IsInfinity(settings.MouseSensitivity) ||
@@ -1497,6 +1505,7 @@ namespace BlackXboxLauncher
         private readonly CheckBox originalFov = new CheckBox();
         private readonly NumericUpDown verticalFov = new NumericUpDown();
         private readonly ComboBox motionBlur = new ComboBox();
+        private readonly ComboBox actionBlur = new ComboBox();
         private readonly ComboBox inputMode = new ComboBox();
         private readonly ComboBox promptMode = new ComboBox();
         private readonly NumericUpDown mouseSensitivity = new NumericUpDown();
@@ -1639,11 +1648,16 @@ namespace BlackXboxLauncher
             SelectChoice(aoQuality, new LaunchOptions().AoQuality); graphics.Controls.Add(aoQuality);
             aoQuality.Enabled = false;
             aoMethod.SelectedIndexChanged += delegate { aoQuality.Enabled = ChoiceValue(aoMethod) != "off"; };
-            AddOptionLabel(graphics, "Effects of the GPU renderer, applied to the picture before the HUD. The game's Video Settings page", 14, 137, 592).ForeColor = muted;
-            AddOptionLabel(graphics, "(Options > V) changes them while playing. Internal resolution is on the Display tab.", 14, 162, 592).ForeColor = muted;
+            AddOptionLabel(graphics, "Action blur", 14, 127, 120);
+            ConfigureChoices(actionBlur, "Action blur", 140, 123, 174,
+                new DisplayChoice("original", "Original"), new DisplayChoice("off", "Off"));
+            SelectChoice(actionBlur, new LaunchOptions().ActionBlur); graphics.Controls.Add(actionBlur);
+            AddOptionLabel(graphics, "Effects of the GPU renderer, applied to the picture before the HUD. The game's Video Settings page", 14, 174, 592).ForeColor = muted;
+            AddOptionLabel(graphics, "(Options > V) changes them while playing. Internal resolution is on the Display tab.", 14, 199, 592).ForeColor = muted;
             SetSettingsTip(antiAliasing, "FXAA smooths jagged edges at almost no cost. SSAA 4x renders twice as wide and high and averages down: the cleanest and the heaviest. Needs the GPU renderer.");
             SetSettingsTip(anisotropy, "Keeps textures sharp on floors and walls seen at a slant. Costs almost nothing. Needs the GPU renderer.");
             SetSettingsTip(depthOfField, "Blurs what is behind the point you are looking at; the weapon and the HUD stay sharp. Needs the GPU renderer.");
+            SetSettingsTip(actionBlur, "Original keeps BLACK's own blur while reloading and aiming. Off removes it; motion blur and depth of field are separate settings.");
             SetSettingsTip(sharpening, "Brings back fine detail that filtering and scaling soften. Needs the GPU renderer.");
             SetSettingsTip(aoMethod, "Ambient occlusion adds contact shading using scene depth. Choose SSAO Classic, HBAO, HBAO+ or GTAO. Needs the GPU renderer.");
             SetSettingsTip(aoQuality, "Higher quality increases AO sampling density and radius, with more GPU work. All levels use scene resolution and depth-aware blur. Choose an AO method to enable the effect.");
@@ -1879,6 +1893,7 @@ namespace BlackXboxLauncher
             SelectChoice(presentFilter, settings.PresentFilter); vsync.Checked = settings.VSync;
             SelectChoice(fpsLimit, settings.FpsLimit.ToString(CultureInfo.InvariantCulture));
             SelectChoice(cameraAspect, settings.CameraAspect); SelectChoice(motionBlur, settings.MotionBlur);
+            SelectChoice(actionBlur, settings.ActionBlur);
             originalFov.Checked = settings.VerticalFov == 0.0;
             if (!originalFov.Checked) verticalFov.Value = (decimal)settings.VerticalFov;
             SelectChoice(antiAliasing, settings.AntiAliasing); SelectChoice(anisotropy, settings.Anisotropy.ToString(CultureInfo.InvariantCulture));
@@ -1945,6 +1960,7 @@ namespace BlackXboxLauncher
                 WindowMode = ChoiceValue(windowMode), ScaleMode = ChoiceValue(scaleMode), PresentFilter = ChoiceValue(presentFilter),
                 VSync = vsync.Checked, FpsLimit = int.Parse(ChoiceValue(fpsLimit), CultureInfo.InvariantCulture),
                 CameraAspect = ChoiceValue(cameraAspect), MotionBlur = ChoiceValue(motionBlur),
+                ActionBlur = ChoiceValue(actionBlur),
                 VerticalFov = originalFov.Checked ? 0.0 : (double)verticalFov.Value,
                 InputMode = ChoiceValue(inputMode), PromptMode = ChoiceValue(promptMode),
                 MouseSensitivity = (double)mouseSensitivity.Value, InvertY = invertY.Checked,

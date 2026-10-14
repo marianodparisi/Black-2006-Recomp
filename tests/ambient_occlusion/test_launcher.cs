@@ -96,6 +96,15 @@ namespace BlackXboxLauncher
                         "Malformed visual trace field does not drop other settings: " + malformedVisualField);
                 }
                 Check(!LaunchOptions.FromSettingsJson("{} ").VisualTraceEnabled, "Older launcher settings keep tracing disabled.");
+                {
+                    var blurOff = new LaunchOptions { ActionBlur = "off" };
+                    blurOff.Validate();
+                    var blurParsed = new LaunchOptions();
+                    Check(blurOff.VideoIni().Contains("action_blur=off\n") && blurParsed.ApplyVideoIni(blurOff.VideoIni()) == 18 &&
+                        blurParsed.ActionBlur == "off" && blurParsed.MotionBlur == "original" && blurParsed.DepthOfField == "off",
+                        "Action blur round trips independently of motion blur and depth of field.");
+                    Check(defaults.ActionBlur == "original", "Action blur defaults to the original effect.");
+                }
                 Check(LaunchOptions.FromSettingsJson("{\"DspTraceEnabled\":true}").DspTraceEnabled,
                     "DSP trace setting persists without a schema migration.");
                 var malformedDspTraceSettings = LaunchOptions.FromSettingsJson("{\"DspTraceEnabled\":\"yes\",\"Threads\":7}");
@@ -108,7 +117,7 @@ namespace BlackXboxLauncher
                         chosen.Validate();
                         Check(GameSession.CreateStartInfo(fixture, chosen) != null, "Accepted AO " + method + "/" + quality);
                         var parsed = new LaunchOptions();
-                        Check(parsed.ApplyVideoIni(chosen.VideoIni()) == 17 && parsed.AoMethod == method && parsed.AoQuality == quality,
+                        Check(parsed.ApplyVideoIni(chosen.VideoIni()) == 18 && parsed.AoMethod == method && parsed.AoQuality == quality,
                             "Shared video.ini round trip: " + method + "/" + quality);
                         var restored = LaunchOptions.FromSettingsJson(new JavaScriptSerializer().Serialize(chosen));
                         Check(restored.AoMethod == method && restored.AoQuality == quality, "Launcher JSON preserves AO choices.");

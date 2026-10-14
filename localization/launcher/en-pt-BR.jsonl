@@ -355,3 +355,5 @@
 {"id": "1062", "text": "Slot ", "pt-BR": "Slot "}
 {"id": "1063", "text": "Use Profile/game setting", "pt-BR": "Use Profile/game setting"}
 {"id": "1064", "text": "validated Profile backups available.", "pt-BR": "validated Profile backups available."}
+{"id": "1065", "text": "Action blur", "pt-BR": "Desfoque de ação"}
+{"id": "1066", "text": "Original keeps BLACK's own blur while reloading and aiming. Off removes it; motion blur and depth of field are separate settings.", "pt-BR": "Original mantém o desfoque de BLACK ao recarregar e mirar. Desativado o remove; desfoque de movimento e profundidade de campo são ajustes separados."}

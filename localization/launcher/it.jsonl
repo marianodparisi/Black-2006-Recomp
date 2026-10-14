@@ -355,3 +355,5 @@
 {"id": "1062", "text": "Slot "}
 {"id": "1063", "text": "Usa impostazione profilo/gioco"}
 {"id": "1064", "text": "backup validi del profilo disponibili."}
+{"id": "1065", "text": "Sfocatura d'azione", "review_status": "editorial-revised-needs-native-review"}
+{"id": "1066", "text": "Originale mantiene la sfocatura di BLACK durante la ricarica e la mira. Disattivato la rimuove; motion blur e profondità di campo sono impostazioni separate.", "review_status": "editorial-revised-needs-native-review"}

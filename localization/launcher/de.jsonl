@@ -355,3 +355,5 @@
 {"id": "1062", "text": "Profilplatz "}
 {"id": "1063", "text": "Profil-/Spieleinstellung verwenden"}
 {"id": "1064", "text": "gültige Profilsicherungen verfügbar."}
+{"id": "1065", "text": "Aktionsunschärfe", "review_status": "editorial-revised-needs-native-review"}
+{"id": "1066", "text": "Original behält die Unschärfe von BLACK beim Nachladen und Zielen bei. Aus entfernt sie; Bewegungsunschärfe und Tiefenschärfe sind eigene Einstellungen.", "review_status": "editorial-revised-needs-native-review"}
