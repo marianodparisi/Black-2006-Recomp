@@ -458,6 +458,8 @@ static void qemu_cond_signal(int *cond)
 static void qemu_cond_wait(int *cond,int *lock)
 { CHECK(cond==&frame_state->cond && lock==&frame_state->lock && frame_state->is_idle && locked); life('W'); frame_state->exiting=true; }
 static void update_irq(MCPXAPUState *d) { (void)d; CHECK(locked); ++irq_publications; }
+/* PIO writers (apu_vp.c) are not part of this fixture. */
+static void mcpx_apu_pio_handoff(MCPXAPUState *d) { (void)d; }
 static void throttle(MCPXAPUState *d)
 {
     CHECK(locked && initialized && !finalized); life('T');

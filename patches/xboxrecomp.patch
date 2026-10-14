@@ -257,7 +257,7 @@ index f7b9f8f..79b537b 100644
  uint64_t mcpx_apu_mmio_read(MCPXAPUState *d, uint64_t addr, unsigned int size);
 
 diff --git a/src/apu/apu_core.c b/src/apu/apu_core.c
-index 459be77..7d3339d 100644
+index 459be77..4ba263a 100644
 --- a/src/apu/apu_core.c
 +++ b/src/apu/apu_core.c
 @@ -21,6 +21,7 @@
@@ -851,10 +851,35 @@ index 459be77..7d3339d 100644
 
      d->sleep_acc_us += (int)(qemu_clock_get_us(QEMU_CLOCK_REALTIME) - now_us);
  }
-@@ -432,13 +743,37 @@ static void se_frame(MCPXAPUState *d)
+@@ -432,13 +743,62 @@ static void se_frame(MCPXAPUState *d)
   * APU frame thread (background processing)
   * ============================================================ */
 
++/* The frame thread keeps d->lock across up to eight frames between its waits
++ * (throttle waits once per eight), and a title thread writing a PIO method
++ * waited for all of them: about a quarter of BLACK's main thread in busy
++ * scenes. Between frames, a waiting writer gets the lock: the method still
++ * runs at once, in order, as before, after at most one frame instead of
++ * eight. RECOMP_APU_PIO_HANDOFF=0 keeps the lock across the frames. */
++extern volatile LONG g_apu_pio_waiters;
++
++static void mcpx_apu_pio_handoff(MCPXAPUState *d)
++{
++    static int on = -1;
++    int turns = 0;
++    if (on < 0) {
++        const char *e = getenv("RECOMP_APU_PIO_HANDOFF");
++        on = !(e && *e == '0');
++    }
++    if (!on || !InterlockedCompareExchange(&g_apu_pio_waiters, 0, 0))
++        return;
++    qemu_mutex_unlock(&d->lock);
++    /* bounded: a title writing methods back to back must not starve the audio */
++    while (InterlockedCompareExchange(&g_apu_pio_waiters, 0, 0) && turns++ < 64)
++        SwitchToThread();
++    qemu_mutex_lock(&d->lock);
++}
++
 +/* How the frame thread spends its frames, for a hang report: running the
 + * voice processor, or only the monitor because the front end is off, halted
 + * or trapped. */
@@ -890,7 +915,7 @@ index 459be77..7d3339d 100644
              d->is_idle = true;
              qemu_cond_signal(&d->idle_cond);
              qemu_cond_wait(&d->cond, &d->lock);
-@@ -446,10 +781,24 @@ static void *mcpx_apu_frame_thread(void *arg)
+@@ -446,10 +806,24 @@ static void *mcpx_apu_frame_thread(void *arg)
              continue;
          }
 
@@ -919,7 +944,7 @@ index 459be77..7d3339d 100644
 
          int xcntmode = GET_MASK(qatomic_read(&d->regs[NV_PAPU_SECTL]),
                                  NV_PAPU_SECTL_XCNTMODE);
-@@ -458,16 +807,59 @@ static void *mcpx_apu_frame_thread(void *arg)
+@@ -458,16 +832,60 @@ static void *mcpx_apu_frame_thread(void *arg)
                            !(fectl & NV_PAPU_FECTL_FEMETHMODE_TRAPPED) &&
                            !(fectl & NV_PAPU_FECTL_FEMETHMODE_HALTED);
 
@@ -961,6 +986,7 @@ index 459be77..7d3339d 100644
              /* Full pipeline: VP voices → DSP → monitor → waveOut */
 +            g_apu_frames_full++;
              se_frame(d);
++            mcpx_apu_pio_handoff(d);
          } else {
 +            g_apu_frames_monitor++;
 +            /* No DSP wrote this tick. Preserve earlier native slices if
@@ -979,7 +1005,7 @@ index 459be77..7d3339d 100644
      qemu_mutex_unlock(&d->lock);
      return NULL;
  }
-@@ -499,6 +891,7 @@ static void mcpx_apu_reset_locked(MCPXAPUState *d)
+@@ -499,6 +917,7 @@ static void mcpx_apu_reset_locked(MCPXAPUState *d)
  {
      memset(d->regs, 0, sizeof(d->regs));
      mcpx_apu_vp_reset(d);
@@ -987,7 +1013,7 @@ index 459be77..7d3339d 100644
 
      if (d->gp.dsp) {
          memset((void *)d->gp.dsp->core.pram_opcache, 0,
-@@ -516,6 +909,11 @@ static void mcpx_apu_reset_locked(MCPXAPUState *d)
+@@ -516,6 +935,11 @@ static void mcpx_apu_reset_locked(MCPXAPUState *d)
   * ============================================================ */
 
  MCPXAPUState *mcpx_apu_init_standalone(uint8_t *ram_ptr)
@@ -999,7 +1025,7 @@ index 459be77..7d3339d 100644
  {
      MCPXAPUState *d = (MCPXAPUState *)calloc(1, sizeof(MCPXAPUState));
      if (!d) {
-@@ -526,6 +924,14 @@ MCPXAPUState *mcpx_apu_init_standalone(uint8_t *ram_ptr)
+@@ -526,6 +950,14 @@ MCPXAPUState *mcpx_apu_init_standalone(uint8_t *ram_ptr)
      g_apu_ram_ptr = ram_ptr;
      g_state = d;
      d->ram_ptr = ram_ptr;
@@ -1014,7 +1040,7 @@ index 459be77..7d3339d 100644
 
      d->set_irq = false;
      d->exiting = false;
-@@ -546,13 +952,6 @@ MCPXAPUState *mcpx_apu_init_standalone(uint8_t *ram_ptr)
+@@ -546,13 +978,6 @@ MCPXAPUState *mcpx_apu_init_standalone(uint8_t *ram_ptr)
      /* Init software mixer for DirectSound bridge */
      mixer_init();
 
@@ -1028,7 +1054,7 @@ index 459be77..7d3339d 100644
      /* Start background frame thread */
      qemu_thread_create(&d->apu_thread, "mcpx.apu_thread",
                         mcpx_apu_frame_thread, d, QEMU_THREAD_JOINABLE);
-@@ -581,7 +980,7 @@ void mcpx_apu_shutdown(MCPXAPUState *d)
+@@ -581,7 +1006,7 @@ void mcpx_apu_shutdown(MCPXAPUState *d)
 
      qemu_thread_join(&d->apu_thread);
      mcpx_apu_vp_finalize(d);
@@ -1037,7 +1063,7 @@ index 459be77..7d3339d 100644
 
      free(d);
      g_state = NULL;
-@@ -614,8 +1013,12 @@ void mcpx_apu_dispatch_mmio(MCPXAPUState *d, hwaddr addr, uint64_t val,
+@@ -614,8 +1039,12 @@ void mcpx_apu_dispatch_mmio(MCPXAPUState *d, hwaddr addr, uint64_t val,
          if (is_write) {
              mcpx_apu_write(d, addr, val, size);
          }
@@ -1051,7 +1077,7 @@ index 459be77..7d3339d 100644
  }
 
  /* ============================================================
-@@ -630,6 +1033,10 @@ uint64_t mcpx_apu_mmio_read(MCPXAPUState *d, uint64_t addr, unsigned int size)
+@@ -630,6 +1059,10 @@ uint64_t mcpx_apu_mmio_read(MCPXAPUState *d, uint64_t addr, unsigned int size)
          return mcpx_apu_vp_read(d, addr - 0x20000, size);
      } else if (addr < 0x20000) {
          return mcpx_apu_read(d, (hwaddr)addr, size);
@@ -3371,7 +3397,7 @@ index 651b334..a8a5307 100644
  extern MCPXAPUState *g_state;
  extern struct McpxApuDebug g_dbg, g_dbg_cache;
 diff --git a/src/apu/apu_vp.c b/src/apu/apu_vp.c
-index b9f429e..e48b085 100644
+index b9f429e..6d83dce 100644
 --- a/src/apu/apu_vp.c
 +++ b/src/apu/apu_vp.c
 @@ -66,9 +66,21 @@ static void set_notify_status(MCPXAPUState *d, uint32_t v, int notifier,
@@ -3618,7 +3644,15 @@ index b9f429e..e48b085 100644
          }
          break;
 
-@@ -567,8 +718,13 @@ void mcpx_apu_vp_write(void *opaque, hwaddr addr, uint64_t val,
+@@ -561,16 +712,28 @@ uint64_t mcpx_apu_vp_read(void *opaque, hwaddr addr, unsigned int size)
+     return 0;
+ }
+
++extern volatile LONG g_apu_pio_waiters;
++
+ void mcpx_apu_vp_write(void *opaque, hwaddr addr, uint64_t val,
+                         unsigned int size)
+ {
      MCPXAPUState *d = (MCPXAPUState *)opaque;
      (void)size;
 
@@ -3627,13 +3661,20 @@ index b9f429e..e48b085 100644
 +     * calls arrive from several host threads, unlike the original CPU, and
 +     * must not race that publication or one another. The shim's mutex is
 +     * recursive, as VOICE_LOCK also takes it. */
++    InterlockedIncrement(&g_apu_pio_waiters);
 +    qemu_mutex_lock(&d->lock);
++    InterlockedDecrement(&g_apu_pio_waiters);
      fe_method(d, (uint32_t)addr, (uint32_t)val);
 +    qemu_mutex_unlock(&d->lock);
  }
 
++/* Title threads waiting for d->lock to write a PIO method (see mcpx_apu_pio_handoff). */
++volatile LONG g_apu_pio_waiters;
++
  /* ============================================================
-@@ -797,7 +953,7 @@ static int voice_get_samples(MCPXAPUState *d, uint32_t v, float samples[][2],
+  * SGE data pointer resolution
+  * ============================================================ */
+@@ -797,7 +960,7 @@ static int voice_get_samples(MCPXAPUState *d, uint32_t v, float samples[][2],
              d->vp.ssl[v].ssl_seg = 0;
              if (!persist) {
                  d->vp.ssl[v].ssl_index = 0;
@@ -3642,7 +3683,7 @@ index b9f429e..e48b085 100644
              } else {
                  set_notify_status(d, v, MCPX_HW_NOTIFIER_SSLA_DONE +
                                    d->vp.ssl[v].ssl_index,
-@@ -843,7 +999,7 @@ static int voice_get_samples(MCPXAPUState *d, uint32_t v, float samples[][2],
+@@ -843,7 +1006,7 @@ static int voice_get_samples(MCPXAPUState *d, uint32_t v, float samples[][2],
                  uint32_t linear_addr = block_index * (uint32_t)block_size;
                  if (stream) {
                      hwaddr addr = segment_offset + linear_addr;
@@ -3651,7 +3692,7 @@ index b9f429e..e48b085 100644
                             block_size);
                  } else {
                      linear_addr += ba;
-@@ -911,7 +1067,8 @@ static int voice_get_samples(MCPXAPUState *d, uint32_t v, float samples[][2],
+@@ -911,7 +1074,8 @@ static int voice_get_samples(MCPXAPUState *d, uint32_t v, float samples[][2],
          }
      }
 
@@ -3661,7 +3702,7 @@ index b9f429e..e48b085 100644
          if (stream) {
              d->vp.ssl[v].ssl_seg += 1;
              cbo = 0;
-@@ -921,15 +1078,19 @@ static int voice_get_samples(MCPXAPUState *d, uint32_t v, float samples[][2],
+@@ -921,15 +1085,19 @@ static int voice_get_samples(MCPXAPUState *d, uint32_t v, float samples[][2],
                  int next_index = (ssl_index + 1) % 2;
                  d->vp.ssl[v].ssl_index = next_index;
                  d->vp.ssl[v].ssl_seg = 0;
@@ -3684,7 +3725,7 @@ index b9f429e..e48b085 100644
              }
          }
      }
-@@ -940,32 +1101,122 @@ static int voice_get_samples(MCPXAPUState *d, uint32_t v, float samples[][2],
+@@ -940,32 +1108,122 @@ static int voice_get_samples(MCPXAPUState *d, uint32_t v, float samples[][2],
  }
 
  /* ============================================================
@@ -3825,7 +3866,7 @@ index b9f429e..e48b085 100644
  }
 
  /* ============================================================
-@@ -1041,7 +1292,7 @@ static void voice_process(MCPXAPUState *d,
+@@ -1041,7 +1299,7 @@ static void voice_process(MCPXAPUState *d,
          for (int sample_count = 0; sample_count < NUM_SAMPLES_PER_FRAME;) {
              int active = voice_get_mask(d, v, NV_PAVS_VOICE_PAR_STATE,
                                          NV_PAVS_VOICE_PAR_STATE_ACTIVE_VOICE);
@@ -3834,7 +3875,7 @@ index b9f429e..e48b085 100644
              int count = voice_resample(d, v, &samples[sample_count],
                                         NUM_SAMPLES_PER_FRAME - sample_count, rate);
              if (count < 0) break;
-@@ -1049,10 +1300,6 @@ static void voice_process(MCPXAPUState *d,
+@@ -1049,10 +1307,6 @@ static void voice_process(MCPXAPUState *d,
          }
      }
 
@@ -3845,7 +3886,7 @@ index b9f429e..e48b085 100644
      /* Get volume bins */
      int bin[8];
      bin[0] = voice_get_mask(d, v, NV_PAVS_VOICE_CFG_VBIN, NV_PAVS_VOICE_CFG_VBIN_V0BIN);
-@@ -1169,39 +1416,169 @@ static void voice_process(MCPXAPUState *d,
+@@ -1169,39 +1423,169 @@ static void voice_process(MCPXAPUState *d,
   * Simplified single-threaded version (no worker threads initially)
   * ============================================================ */
 
@@ -4024,7 +4065,7 @@ index b9f429e..e48b085 100644
 
      /* VP monitor output */
      if (d->monitor.point == MCPX_APU_DEBUG_MON_VP) {
-@@ -1243,5 +1620,6 @@ void mcpx_apu_vp_reset(MCPXAPUState *d)
+@@ -1243,5 +1627,6 @@ void mcpx_apu_vp_reset(MCPXAPUState *d)
      memset(d->vp.voice_locked, 0, sizeof(d->vp.voice_locked));
      for (int v = 0; v < MCPX_HW_MAX_VOICES; v++) {
          hrtf_filter_init(&d->vp.filters[v].hrtf);
