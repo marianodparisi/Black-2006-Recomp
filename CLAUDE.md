@@ -115,6 +115,18 @@ El NTSC es el **layout canónico**. Todo el código del repo sigue con direccion
     - Además, `main.c` usa `recomp_dispatch_init` sin declararla. Eso se resuelve con `-Wno-error=implicit-function-declaration` en el toolchain.
   - Los arreglos están en `tools/cross-macos/` (`xboxrecomp-clang-cl.patch` y `repo-clang-cl.diff`, que conserva sus CRLF) y se aplican **solo** en un worktree aparte, no en esta rama. Cómo armarlo: `tools/cross-macos/build.sh`.
 
+## Corre en Windows (2026-10-14)
+
+- Compila y corre en la PC del usuario (i5-12400F, RTX 2060 Super) con el XBE PAL. Build incremental: `cmake --build build-vs2022 --config Release --target black_xbox_recomp` (segundos); `setup.ps1` regenera todo desde el XBE.
+- El launcher borra las variables `RECOMP_*`. Para diagnosticar, correr el `.exe` directo con el entorno de `reports\launcher-*\launch.json` más las variables de traza.
+- **Mouse:** `pc_input_frame_complete` daba por terminado el gameplay en cada frame sin actualización de cámara. Soltaba el puntero (unas 200 veces por partida) y tiraba el movimiento. Ahora tolera huecos de hasta 150 ms (`PC_GAMEPLAY_GAP_MS`).
+- **Velocidad:** con `RECOMP_BLACK_60HZ` el mundo avanza 1/60 s por vuelta del loop, y el tiempo del juego es `ticks × paso` (`0x2F4368` canónico; los timers calculan `+0x20` desde los ticks). Cambiar el paso en vivo haría saltar todos los timers. Para ir a tiempo real el loop tiene que dar 60 vueltas por segundo.
+  - El reloj de vblank emulado perdía vblanks cuando el hilo del timer se atrasaba más de un período (reiniciaba la grilla): ~57.6/s. `RECOMP_VBLANK_KEEP_GRID=1` (el launcher lo activa) los entrega tarde en vez de descartarlos. Medido con `RECOMP_BLACK_SIMLOG=300`: mediana de 0.91x a 0.97x de tiempo real.
+  - Probado y descartado: demorar el vblank hasta que el frame llegue a su `FLIP_STALL` (catch-up de flips). No mejoró: 0.89x.
+  - En escenas pesadas sigue a ~0.8x: el frame cuesta más de 16.7 ms. Ahí hace falta rendimiento, o correr a 30 Hz.
+  - `RECOMP_VBLANK_STATS=1` imprime vblanks entregados, recuperados, perdidos y reinicios cada 5 s.
+- El fundido del desenfoque de recarga del juego dura 75 pasos (1.25 s a velocidad real). DoF en Off también lo apaga (`sub_001772E0`).
+
 ## Pendiente
 
 1. **Compilar y correr en Windows**: VS2022, CMake 3.20+, Python 3.10+, Rust con `x86_64-pc-windows-msvc`, CPU con AVX2.
