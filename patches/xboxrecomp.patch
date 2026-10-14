@@ -35697,10 +35697,10 @@ index 2189a3b..175c522 100644
 +    target_link_libraries(xbox_video PUBLIC mfplat mfreadwrite mfuuid mf ole32 gdi32 user32)
  endif()
 diff --git a/src/video/fb_present.c b/src/video/fb_present.c
-index 69ced11..2b2c994 100644
+index 69ced11..ae24eed 100644
 --- a/src/video/fb_present.c
 +++ b/src/video/fb_present.c
-@@ -1,219 +1,973 @@
+@@ -1,219 +1,977 @@
 -/**
 - * Show the guest framebuffer in a window.
 - *
@@ -36211,6 +36211,10 @@ index 69ced11..2b2c994 100644
 +    case WM_MOUSEWHEEL:
 +        pc_input_wheel_event(GET_WHEEL_DELTA_WPARAM(w));
 +        *result = 0; return 1;
++    case WM_MOUSEMOVE:
++        /* a native menu page follows the free pointer (gameplay captures it and reads raw motion instead) */
++        if (!s_ui_captured) pc_menu_pointer((int)(short)LOWORD(l), (int)(short)HIWORD(l));
++        return 0;
 +    case WM_INPUT: {
 +        RAWINPUT raw = {0}; UINT size = sizeof(raw);
 +        UINT received = GetRawInputData((HRAWINPUT)l, RID_INPUT, &raw, &size, sizeof(RAWINPUTHEADER));
@@ -37015,7 +37019,7 @@ diff --git a/src/video/pc_menu.c b/src/video/pc_menu.c
 new file mode 100644
 --- /dev/null
 +++ b/src/video/pc_menu.c
-@@ -0,0 +1,2484 @@
+@@ -0,0 +1,2582 @@
 +/* Native, editable menus. See pc_menu.h.
 + *
 + * The page logic follows the menu classes the game's own pages are written with (BkMenuList,
@@ -37758,6 +37762,16 @@ new file mode 100644
 +static volatile LONG m_active;
 +static ULONGLONG m_active_tick;
 +static Display m_display, m_scratch;     /* m_display under m_lock; m_scratch is the game thread's */
++/* Where each item of the shown page is, for the pointer: in menu units, written by build (game thread) into
++ * m_hit_scratch and published with the display list. kind is IT_*, split the x where a click changes meaning
++ * (OFF of a toggle, the lit end of a slider), or 0. m_xf maps menu units to client pixels (presenter thread). */
++typedef struct Hit { float x0, y0, x1, y1, split; int kind, ok; } Hit;
++static Hit m_hit[PCM_ITEMS], m_hit_scratch[PCM_ITEMS];
++static int m_hit_n, m_hit_scratch_n;
++static float m_xf_ox, m_xf_oy, m_xf_s;
++static int m_pointer_item = -1, m_pointer_known;
++static float m_pointer_mx;
++#define PCM_ACT_HOVER 64                 /* + item index: the pointer moved onto that item */
 +static unsigned m_generation;
 +/* The presenter asks for the overlay every frame it shows. A native page needs it (it is what draws the page and
 + * installs the input filter): without it -- the game started without the presenter window -- pages stay the game's. */
@@ -38399,6 +38413,23 @@ new file mode 100644
 +        if (item_visible(host, &p->item[i])) y += p->step + (p->item[i].kind == IT_SLIDER ? 37.0f : 0.0f);   /* a slider's bar */
 +        else ys[i] = -1;
 +    }
++    m_hit_scratch_n = p->nitem;
++    for (i = 0; i < p->nitem; i++) {
++        /* the selector bar's area (and a slider's row of bullets below it) */
++        Hit *h = &m_hit_scratch[i];
++        const Item *it = &p->item[i];
++        const float bw = p->bar_w > 0 ? p->bar_w : 300.0f;
++        h->ok = ys[i] >= 0 && !loading && item_focusable(host, it);
++        h->kind = it->kind;
++        h->x0 = p->list_x - 7; h->x1 = h->x0 + bw;
++        /* a row's values belong to it even where a narrow selector does not reach them */
++        if (it->kind == IT_TOGGLE && p->col2 > 0 && p->col2 + 60.0f > h->x1) h->x1 = p->col2 + 60.0f;
++        if (p->values_x > 0 && p->values_x + 8.0f > h->x1) h->x1 = p->values_x + 8.0f;
++        h->y0 = ys[i] - 8; h->y1 = ys[i] + 18 + (it->kind == IT_SLIDER ? 37.0f : 0.0f);
++        h->split = 0;
++        if (it->kind == IT_TOGGLE && p->col2 > p->col1) h->split = p->col2 - 6.0f;
++        else if (it->kind == IT_SLIDER && it->step > 0) h->split = p->list_x - 2 + (float)((m_slider[i] - it->lo) / it->step) * 10.0f;
++    }
 +    {   /* the selector: a dark bar behind the focused item, brackets at its ends, lines out to the rail and the edge */
 +        const float u = st->anim > 0 ? ease((float)((t - m_focus_t0) / st->anim)) : 1.0f;
 +        if (m_focus >= 0 && m_focus < p->nitem && ys[m_focus] >= 0 && !loading) {
@@ -38549,6 +38580,9 @@ new file mode 100644
 +        m_depth = 0;                                /* subpages leave with their underlying game page */
 +        m_focus = m_prev_focus = -1;
 +        m_page_t0 = t;
++        AcquireSRWLockExclusive(&m_lock);
++        m_hit_n = 0; m_pointer_item = -1;
++        ReleaseSRWLockExclusive(&m_lock);
 +        if (idx >= 0) {
 +            p = &m_doc->page[idx];
 +            m_page = idx;
@@ -38590,6 +38624,14 @@ new file mode 100644
 +            if (m_page < 0) continue;
 +            p = &m_doc->page[m_page];
 +            first_focus(host, p, t);
++            if (actions[i] >= PCM_ACT_HOVER) {
++                const int target = actions[i] - PCM_ACT_HOVER;
++                if (target < p->nitem && target != m_focus && item_focusable(host, &p->item[target])) {
++                    play(host, "SNDChange");
++                    set_focus(host, p, target, t);
++                }
++                continue;
++            }
 +            apply(host, p, actions[i], t);
 +            if (actions[i] == PCM_ACT_CONFIRM || actions[i] == PCM_ACT_BACK || actions[i] == PCM_ACT_START)
 +                break;                                                                  /* the page may be leaving */
@@ -38610,6 +38652,8 @@ new file mode 100644
 +        memcpy(m_display.prim, m_scratch.prim, sizeof(Prim) * (size_t)m_scratch.n);
 +        m_generation++;
 +    }
++    memcpy(m_hit, m_hit_scratch, sizeof(m_hit));
++    m_hit_n = m_hit_scratch_n;
 +    ReleaseSRWLockExclusive(&m_lock);
 +    m_active_tick = GetTickCount64();
 +    if (!InterlockedExchange(&m_active, 1)) pc_video_menu_hide_hint(1);
@@ -38708,10 +38752,43 @@ new file mode 100644
 +    ReleaseSRWLockExclusive(&m_lock);
 +    if (take && down) {
 +        input_seen();
-+        if (button == 0) queue(PCM_ACT_CONFIRM);
-+        else if (button == 1) queue(PCM_ACT_BACK);
++        if (button == 0) {
++            int item, kind = IT_BUTTON, act = PCM_ACT_CONFIRM;
++            AcquireSRWLockShared(&m_lock);
++            item = m_pointer_known ? m_pointer_item : -2;    /* -2: no pointer yet, the keyboard's confirm */
++            if (item >= 0 && item < m_hit_n) {
++                const Hit *h = &m_hit[item];
++                kind = h->kind;
++                if (kind == IT_TOGGLE && h->split > 0) act = m_pointer_mx >= h->split ? PCM_ACT_RIGHT : PCM_ACT_LEFT;
++                else if (kind == IT_SLIDER) act = m_pointer_mx >= h->split ? PCM_ACT_RIGHT : PCM_ACT_LEFT;
++            }
++            ReleaseSRWLockShared(&m_lock);
++            if (item >= 0) { queue(PCM_ACT_HOVER + item); queue(act); }
++            else if (item == -2) queue(PCM_ACT_CONFIRM);
++        } else if (button == 1) queue(PCM_ACT_BACK);
 +    }
 +    return take;
++}
++
++void pc_menu_pointer(int x, int y)
++{
++    int i, item = -1, changed;
++    float mx, my;
++    if (!pc_menu_active()) return;
++    AcquireSRWLockExclusive(&m_lock);
++    if (m_xf_s <= 0) { ReleaseSRWLockExclusive(&m_lock); return; }
++    mx = ((float)x - m_xf_ox) / m_xf_s;
++    my = ((float)y - m_xf_oy) / m_xf_s;
++    for (i = 0; i < m_hit_n; i++) {
++        const Hit *h = &m_hit[i];
++        if (h->ok && mx >= h->x0 && mx < h->x1 && my >= h->y0 && my < h->y1) { item = i; break; }
++    }
++    changed = item != m_pointer_item;
++    m_pointer_item = item;
++    m_pointer_mx = mx;
++    m_pointer_known = 1;
++    ReleaseSRWLockExclusive(&m_lock);
++    if (changed && item >= 0) { input_seen(); queue(PCM_ACT_HOVER + item); }
 +}
 +
 +static int f_wheel(int delta)
@@ -39154,6 +39231,13 @@ new file mode 100644
 +    Box boxes[PCM_BOXES];
 +    m_overlay_seen = GetTickCount64();
 +    m_dirty.x0 = m_dirty.y0 = m_dirty.x1 = m_dirty.y1 = 0;
++    if (pw && ph) {
++        Canvas xf;
++        canvas_for(&xf, NULL, w, h, px, py, pw, ph);
++        AcquireSRWLockExclusive(&m_lock);
++        m_xf_ox = xf.ox; m_xf_oy = xf.oy; m_xf_s = xf.s;
++        ReleaseSRWLockExclusive(&m_lock);
++    }
 +    video_on = pc_video_menu_overlay(w, h, &video, &video_changed);
 +    menu_on = pc_menu_active();
 +    if (!menu_on) {
@@ -39422,6 +39506,8 @@ new file mode 100644
 +    m_generation++;
 +    ReleaseSRWLockExclusive(&m_lock);
 +    m_page = -1; m_page_name[0] = 0; m_focus = m_prev_focus = -1; m_depth = 0;
++    m_hit_n = m_hit_scratch_n = 0; m_pointer_item = -1; m_pointer_known = 0; m_xf_s = 0;
++    m_button_swallowed = 0;
 +    m_disabled = 0;
 +    InterlockedExchange(&m_input_seen, 0);
 +    pc_menu_set_movie_skip_prompt(0);
@@ -39453,6 +39539,18 @@ new file mode 100644
 +    free(d);
 +    return 1;
 +}
++
++void pc_menu_test_pointer_space(unsigned w, unsigned h)
++{
++    Canvas xf;
++    canvas_for(&xf, NULL, w, h, 0, 0, w, h);
++    AcquireSRWLockExclusive(&m_lock);
++    m_xf_ox = xf.ox; m_xf_oy = xf.oy; m_xf_s = xf.s;
++    ReleaseSRWLockExclusive(&m_lock);
++}
++
++void pc_menu_test_button(int button, int down) { f_button(button, down); }
++int pc_menu_test_pointer_item(void) { return m_pointer_item; }
 +
 +size_t pc_menu_test_dump(char *out, size_t cap)
 +{
@@ -39498,6 +39596,10 @@ new file mode 100644
 +int pc_menu_test_focus(void) { return -1; }
 +int pc_menu_test_load_file(const char *path) { (void)path; return 0; }
 +int pc_menu_test_render(uint32_t *p, unsigned w, unsigned h) { (void)p; (void)w; (void)h; return 0; }
++void pc_menu_pointer(int x, int y) { (void)x; (void)y; }
++void pc_menu_test_pointer_space(unsigned w, unsigned h) { (void)w; (void)h; }
++void pc_menu_test_button(int button, int down) { (void)button; (void)down; }
++int pc_menu_test_pointer_item(void) { return -1; }
 +size_t pc_menu_test_dump(char *out, size_t cap) { (void)out; (void)cap; return 0; }
 +#endif
 diff --git a/src/video/pc_menu.h b/src/video/pc_menu.h
@@ -39505,7 +39607,7 @@ new file mode 100644
 index 0000000..c47114d
 --- /dev/null
 +++ b/src/video/pc_menu.h
-@@ -0,0 +1,160 @@
+@@ -0,0 +1,168 @@
 +/*
 + * pc_menu.h -- native, editable menus, drawn by the presenter over the game picture.
 + *
@@ -39620,6 +39722,10 @@ index 0000000..c47114d
 +
 +/* A native page is on screen (any thread). */
 +int pc_menu_active(void);
++/* Window thread: the pointer moved to (x, y) in client pixels, the same space as pc_menu_overlay's picture
++ * rectangle. On a native page the item under it takes the focus, and a left click acts on that item
++ * (confirm; ON/OFF and sliders by where the click lands); a click away from the items does nothing. */
++void pc_menu_pointer(int x, int y);
 +
 +/* 1 when the player used a native page (a key, button or stick) since the last call; clears it (any thread). A
 + * native page takes all input, so the game's own idle checks (an attract mode) would see none: the game project
@@ -39652,6 +39758,10 @@ index 0000000..c47114d
 +
 +/* START is the pad's start button: back on a page with "start = back", confirm elsewhere (as the original). */
 +enum { PCM_ACT_UP = 1, PCM_ACT_DOWN, PCM_ACT_LEFT, PCM_ACT_RIGHT, PCM_ACT_CONFIRM, PCM_ACT_BACK, PCM_ACT_START, PCM_ACT_VIDEO };
++/* Tests: the menu-space to pixel mapping the pointer uses, as pc_menu_test_render sets it for w x h. */
++void pc_menu_test_pointer_space(unsigned w, unsigned h);
++void pc_menu_test_button(int button, int down);  /* a mouse button, through the native page's input filter */
++int pc_menu_test_pointer_item(void);              /* the item under the pointer, -1 none */
 +void pc_menu_test_reset(const char *definition);   /* forget state, use this definition (no file) */
 +void pc_menu_test_action(int action);              /* as if the player pressed it */
 +int pc_menu_test_focus(void);                      /* index of the focused item, -1 none */

@@ -127,6 +127,7 @@ El NTSC es el **layout canónico**. Todo el código del repo sigue con direccion
   - En escenas pesadas sigue a ~0.8x: el frame cuesta más de 16.7 ms. Ahí hace falta rendimiento, o correr a 30 Hz.
   - `RECOMP_VBLANK_STATS=1` imprime vblanks entregados, recuperados, perdidos y reinicios cada 5 s.
 - **Desenfoque de recarga y apuntado** (`sub_001772E0`, compuesto propio del juego): tiene su propia opción, Action blur (`action_blur=original|off` en `video.ini`, pestaña Graphics del launcher). Es independiente del motion blur y del DoF agregado. El fundido dura 75 pasos (1.25 s a velocidad real).
+- **Mouse en menús nativos:** `pc_menu_pointer` (desde `WM_MOUSEMOVE` en `fb_present.c`) pone el foco en la fila bajo el puntero; el clic izquierdo confirma esa fila (ON/OFF y sliders según dónde caiga) y fuera de las filas no hace nada. `build()` guarda los rectángulos (`m_hit`) y `page_overlay` la transformación 640x480 → ventana. Las páginas APT del juego (briefing, selección de misión) no tienen hover. Test: `test_pointer` en `test_menu.c`.
 - **Español oficial verificado:** con "Español (official)" el launcher pasa `RECOMP_XBOX_LANGUAGE=5` y el juego carga `MainSp.bin`. En inglés carga `MainUK.bin`.
 - Ojo al restaurar archivos con `Copy-Item`: conserva la fecha vieja y MSBuild no recompila. Hacer `touch` después.
 

@@ -657,6 +657,98 @@ static void test_options(void)
     CHECK(log_is("sound SNDChange\nvideo\nsound SNDSelect\n"), "the last item opens the Video Settings page: '%s'", g_log);
 }
 
+/* The pointer, in a 640 x 480 client area (menu units are pixels): sweep it over the page to find the rows,
+ * then hover and click them. Before the pointer has moved, a left click is still the keyboard's confirm. */
+static void click(const char *page)
+{
+    pc_menu_test_button(0, 1);
+    pc_menu_test_button(0, 0);
+    tick(page);
+}
+
+static int sweep(const char *page, int top[8], int left[8], int right[8])
+{
+    int x, y, f, n = 0;
+    for (f = 0; f < 8; f++) { top[f] = -1; left[f] = 9999; right[f] = -1; }
+    for (y = 0; y < 480; y += 2)
+        for (x = 0; x < 640; x += 4) {
+            pc_menu_pointer(x, y);
+            tick(page);
+            f = pc_menu_test_pointer_item();
+            if (f < 0 || f >= 8) continue;
+            if (top[f] < 0) { top[f] = y; n++; }
+            if (y == top[f] + 10) { if (x < left[f]) left[f] = x; if (x > right[f]) right[f] = x; }
+        }
+    return n;
+}
+
+static void test_pointer(void)
+{
+    int top[8], left[8], right[8], n, f;
+    reset_game();
+    tick("PauseMenu");
+    pc_menu_test_pointer_space(640, 480);
+    log_clear();
+    click("PauseMenu");
+    CHECK(log_is("gamecode ClosePauseMenu 0 0 0\nsound SNDSelect\n"), "before the pointer moves, a click confirms the focused item: '%s'", g_log);
+
+    reset_game();
+    tick("PauseMenu");
+    pc_menu_test_pointer_space(640, 480);
+    n = sweep("PauseMenu", top, left, right);
+    CHECK(n == 5, "the sweep finds the pause menu's five rows (%d)", n);
+    for (f = 1; f < n; f++) CHECK(top[f] > top[f - 1], "row %d is below row %d (%d, %d)", f, f - 1, top[f], top[f - 1]);
+    pc_menu_pointer(left[0] + 4, top[0] + 10); tick("PauseMenu");
+    log_clear();
+    pc_menu_pointer(left[1] + 4, top[1] + 10); tick("PauseMenu");
+    CHECK(pc_menu_test_focus() == 1 && log_is("sound SNDChange\n"), "hovering a row focuses it with the change sound: %d '%s'", pc_menu_test_focus(), g_log);
+    log_clear();
+    pc_menu_pointer(left[1] + 20, top[1] + 12); tick("PauseMenu");
+    CHECK(pc_menu_test_focus() == 1 && !g_log[0], "moving within the row changes nothing: '%s'", g_log);
+    click("PauseMenu");
+    CHECK(log_is("page PauseMenuObjectives\nsound SNDSelect\n"), "a click opens the hovered row: '%s'", g_log);
+
+    reset_game();
+    tick("PauseMenu");
+    pc_menu_test_pointer_space(640, 480);
+    pc_menu_pointer(left[0] + 4, top[0] + 10); tick("PauseMenu");
+    pc_menu_pointer(4, 4); tick("PauseMenu");
+    log_clear();
+    click("PauseMenu");
+    CHECK(pc_menu_test_focus() == 0 && !g_log[0], "a click away from the rows does nothing: %d '%s'", pc_menu_test_focus(), g_log);
+    reset_game();
+    tick("PauseMenu");
+    press(PCM_ACT_UP, "PauseMenu");
+    {
+        char keyboard[512];
+        log_clear();
+        press(PCM_ACT_CONFIRM, "PauseMenu");
+        snprintf(keyboard, sizeof(keyboard), "%s", g_log);
+        reset_game();
+        tick("PauseMenu");
+        pc_menu_test_pointer_space(640, 480);
+        pc_menu_pointer(left[4] + 4, top[4] + 10); tick("PauseMenu");
+        log_clear();
+        click("PauseMenu");
+        CHECK(!strcmp(g_log, keyboard), "clicking the last row does what confirming it does: '%s' vs '%s'", g_log, keyboard);
+    }
+
+    /* ON / OFF: a click on the row's right part is OFF, on its left part ON */
+    reset_game();
+    tick("PauseMenuOptionXbox");
+    pc_menu_test_pointer_space(640, 480);
+    n = sweep("PauseMenuOptionXbox", top, left, right);
+    CHECK(n >= 4 && top[0] >= 0 && right[0] > left[0], "the options rows are found (%d)", n);
+    pc_menu_pointer(left[0] + 4, top[0] + 10); tick("PauseMenuOptionXbox");
+    log_clear();
+    click("PauseMenuOptionXbox");
+    CHECK(log_is("gamecode ToggleCrouchOnOff 1 0 0\n"), "a click on the left of a toggle row is ON: '%s'", g_log);
+    pc_menu_pointer(right[0] - 2, top[0] + 10); tick("PauseMenuOptionXbox");
+    log_clear();
+    click("PauseMenuOptionXbox");
+    CHECK(log_is("gamecode ToggleCrouchOnOff 0 0 0\n"), "a click on the right of a toggle row is OFF: '%s'", g_log);
+}
+
 static void test_mission_failed(void)
 {
     reset_game();
@@ -1351,6 +1443,7 @@ int main(int argc, char **argv)
     test_native_page_stack();
     test_video_setting_focus_and_layout();
     test_input();
+    test_pointer();
     test_native_video_shortcuts();
     if (g_have_files) test_objectives();
     if (g_have_files) test_render();
