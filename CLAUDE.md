@@ -5,7 +5,7 @@
 ## Objetivo
 
 - Correr **BLACK (Criterion, 2006)** nativo en PC a partir de la copia PAL europea de Xbox del usuario. Después, mejorar los gráficos sobre el renderer D3D11: sombras, texturas, AA, FSR.
-- Es un proyecto personal. Por ahora el usuario prefiere **probar en su PC con Windows antes de publicar nada upstream**: nada de issues ni PRs sin pedírselo.
+- Es un proyecto personal que el usuario desarrolla **de forma independiente del repo original**: prueba en su PC con Windows. No abrir issues ni PRs upstream sin que lo pida.
 
 ## Desarrollo independiente
 
