@@ -1,0 +1,15 @@
+diff --git a/src/nv2a/qemu_shim.h b/src/nv2a/qemu_shim.h
+index e81b9e5..1ceaa69 100644
+--- a/src/nv2a/qemu_shim.h
++++ b/src/nv2a/qemu_shim.h
+@@ -54,8 +54,8 @@ typedef uintptr_t target_ulong;
+  * Bit manipulation
+  * ============================================================ */
+ 
+-/* For MSVC which doesn't have __builtin_ctz: */
+-#ifdef _MSC_VER
++/* For MSVC which doesn't have __builtin_ctz (clang-cl has the builtins): */
++#if defined(_MSC_VER) && !defined(__clang__)
+ #include <intrin.h>
+ static inline int __builtin_ctz(unsigned int x) {
+     unsigned long index;

@@ -79,6 +79,16 @@ El NTSC es el **layout canónico**. Todo el código del repo sigue con direccion
   - Todos los `sub_` que usa el C manual existen.
   - La dispatch mapea la dirección PAL al nombre canónico, por ejemplo `{ 0x0021C80Fu, sub_0021C7EF }`.
 - **Launcher:** con mono, el launcher, la app de configuración y los ejecutables de tests compilan sin avisos. Los chequeos nuevos dieron 24/24, incluida la detección del XBE PAL real. La suite completa de WinForms no corre en macOS.
+- **Cross-compile para Windows desde la Mac** (clang-cl 23, lld-link, xwin con el SDK 10.0.26100, Rust 1.98.1 con `x86_64-pc-windows-msvc`):
+  - Compila y linkea `black_xbox_recomp.exe` completo, con el código generado del PAL: PE32+ x64, unos 60 MB, imports de D3D11, DXGI, XInput y Media Foundation.
+  - Compilan todos los tests de C: `eeprom`, `scope_mask`, `viewmodel`, `weapon_*`, `movie_skip`, `black_audio_completion`, `kernel_*`, `apu_*` y los 7 de `ambient_occlusion`, cámara incluida.
+  - **No se ejecutó nada:** el `.exe` es para Windows y la Mac no tiene Rosetta.
+  - Ningún aviso viene de los cambios PAL. Los 1535 avisos son del código original o del generado; la mayoría son `-Wparentheses-equality`. Hay 6 `-Wsometimes-uninitialized` en `kelvin_pgraph.c` (renderer original, ramas `default` de varios `switch`), sin tocar.
+  - Para clang hacen falta dos arreglos, ambos para cosas que MSVC tolera:
+    - `qemu_shim.h` redefine `__builtin_ctz` y `__builtin_clz`.
+    - `recomp_manual.c` redeclara `mcpx_apu_mmio_read` y `mcpx_apu_mmio_write` con `void *` en lugar de `MCPXAPUState *`.
+    - Además, `main.c` usa `recomp_dispatch_init` sin declararla. Eso se resuelve con `-Wno-error=implicit-function-declaration` en el toolchain.
+  - Los arreglos están en `tools/cross-macos/*.patch` y se aplican **solo** en un worktree aparte, no en esta rama. Cómo armarlo: `tools/cross-macos/build.sh`.
 
 ## Pendiente
 
@@ -91,7 +101,7 @@ El NTSC es el **layout canónico**. Todo el código del repo sigue con direccion
    - Español oficial: elegir "Español (official)" en el launcher y buscar `RECOMP_XBOX_LANGUAGE=5` en `reports\launcher-…`.
    - Velocidad normal: el runtime reporta NTSC a 60 Hz. `0x2F3A38` (canónico) debería valer `1/30`, con el check en `0x3D088889`.
    - Mouse (límites de pitch), zoom, HUD y textos de pickups. Usan muchos datos traducidos.
-3. **Tests de C sin correr:** `tests/eeprom` (cubre `RECOMP_XBOX_LANGUAGE`) y los fixtures que extraen código de `recomp_manual.c`.
+3. **Tests de C: compilan (cross-compile), pero no se corrieron.** En Windows hay que correrlos con `ctest`, en especial `tests/eeprom` (cubre `RECOMP_XBOX_LANGUAGE`) y los fixtures que extraen código de `recomp_manual.c`.
 4. **`sub_00240137`**, caso especial de `generate.py`: no aparece en la salida PAL. Probablemente venga del feedback de icall local del autor.
 5. **Datos de BSS** (`0x2F3BD4`, `0x2F3A38`…): se asumió `+0x20`. Solo se puede confirmar en ejecución.
 6. **Mejoras gráficas**, después de que el juego corra.
