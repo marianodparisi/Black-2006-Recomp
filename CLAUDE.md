@@ -103,8 +103,11 @@ El NTSC es el **layout canónico**. Todo el código del repo sigue con direccion
 - **Tests de C ejecutados en la Mac** como binarios x86_64 bajo Rosetta 2, con `tools/cross-macos/native-tests.sh <fuente> <build>`:
   - **9 suites pasan:** `scope_mask`, `viewmodel`, `weapon_trace`, `weapon_model_trace`, `weapon_runtime`, `weapon_model_math`, `kernel_timer_waitset`, `apu_timing` y `apu_output`. `scope_mask`, `viewmodel` y `weapon_trace` ejecutan código envuelto en `BLACK_VA`.
   - **`ambient_occlusion/camera`:** falla bajo Rosetta en el chequeo de MXCSR. Con el código original del autor falla igual, así que es un límite de Rosetta, no del port.
-  - **Solo Windows** (necesitan Windows o Wine): `eeprom` (cubre `RECOMP_XBOX_LANGUAGE`), `movie_skip`, `black_audio_completion`, `kernel_dpc_queue`, `apu_pitch`, `apu_spatial`, `apu_physical_memory` y el resto de `ambient_occlusion`.
-  - Los casks de Wine de Homebrew están deshabilitados desde 2026-09-01 porque no pasan Gatekeeper.
+- **Tests de Windows bajo Wine 11.18** (build de Gcenx sin firmar, al que se le sacó la cuarentena con autorización del usuario), con `tools/cross-macos/wine-tests.sh <fuente> <build>`:
+  - **Pasan 16 pruebas:** `eeprom-query`, las 6 de `movie_skip`, `black-audio-completion`, `kernel-dpc-queue`, `apu-pitch`, `apu-spatial` (2), `apu-physical-memory`, más los 3 controles `*-old-control`, que fallan como corresponde (`WILL_FAIL`).
+  - **`eeprom-query` verificado con una mutación:** con un runtime que ignora `RECOMP_XBOX_LANGUAGE`, el test falla en los 3 chequeos de idioma.
+  - **`ambient_occlusion`:** pasan `ao-menu`, `ao-post-order`, `ao-scene-retry` y `ao-focus-gap`. Fallan `ao-video`, `ao-warp` (no puede crear el shader D3D11) y las 2 de la cámara (MXCSR). Las 4 fallan igual con el código original del autor: son límites de Wine y Rosetta. `ao-launcher` se saltea (es PowerShell/.NET; ver la sección del launcher con mono).
+- **Bug encontrado y corregido:** `tests/eeprom/test_eeprom.c` usaba `_putenv` sin incluir `<stdlib.h>`. Con MSVC compilaba solo con un aviso.
   - Ningún aviso viene de los cambios PAL. Los 1535 avisos son del código original o del generado; la mayoría son `-Wparentheses-equality`. Hay 6 `-Wsometimes-uninitialized` en `kelvin_pgraph.c` (renderer original, ramas `default` de varios `switch`), sin tocar.
   - Para clang hacen falta dos arreglos, ambos para cosas que MSVC tolera:
     - `qemu_shim.h` redefine `__builtin_ctz` y `__builtin_clz`.
@@ -123,7 +126,7 @@ El NTSC es el **layout canónico**. Todo el código del repo sigue con direccion
    - Español oficial: elegir "Español (official)" en el launcher y buscar `RECOMP_XBOX_LANGUAGE=5` en `reports\launcher-…`.
    - Velocidad normal: el runtime reporta NTSC a 60 Hz. `0x2F3A38` (canónico) debería valer `1/30`, con el check en `0x3D088889`.
    - Mouse (límites de pitch), zoom, HUD y textos de pickups. Usan muchos datos traducidos.
-3. **Tests de C solo-Windows:** compilan, pero no se corrieron. En Windows hay que correrlos con `ctest`, en especial `tests/eeprom` (cubre `RECOMP_XBOX_LANGUAGE`).
+3. **Tests en Windows real:** correr `ctest` en la PC para confirmar lo que bajo Wine y Rosetta no se puede: `ao-video`, `ao-warp`, la cámara y `ao-launcher`.
 4. **`sub_00240137`**, caso especial de `generate.py`: no aparece en la salida PAL. Probablemente venga del feedback de icall local del autor.
 5. **Direcciones traducidas: verificadas estáticamente.** `verify_release.py` contra el XBE PAL da 73/73 ok, BSS incluido. Por ejemplo:
    - El vertex decode PAL (`0x205A0`) usa exactamente `0x295DA0`, `0x295DA4` y `0x295DAC`.
