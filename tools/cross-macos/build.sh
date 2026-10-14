@@ -6,7 +6,7 @@
 #   brew install llvm lld cmake ninja xwin rustup
 #   rustup toolchain install 1.98.1 --profile minimal --target x86_64-pc-windows-msvc
 #   xwin --accept-license --arch x86_64 splat --output "$XWIN_DIR"   (Microsoft SDK license)
-#   git clone --depth 1 --branch v1.0.0 https://github.com/mborgerson/dsp56300.git .work/err009-dsp56300
+#   git clone --depth 1 --branch v1.0.0 https://github.com/marianodparisi/dsp56300.git .work/err009-dsp56300
 #   third_party/xboxrecomp at the pinned commit with patches/xboxrecomp.patch applied,
 #   then tools/cross-macos/xboxrecomp-clang-cl.patch on top of it;
 #   src/recomp/gen from scripts/generate.py.

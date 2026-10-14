@@ -41,7 +41,7 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) { throw 'CMake 3.20 
 
 if (-not (Test-Path -LiteralPath $toolkit)) {
     $null = New-Item -ItemType Directory -Path (Split-Path -Parent $toolkit) -Force
-    Invoke-Checked git @('clone', 'https://github.com/sp00nznet/xboxrecomp.git', $toolkit)
+    Invoke-Checked git @('clone', 'https://github.com/marianodparisi/xboxrecomp.git', $toolkit)
     Invoke-Checked git @('-C', $toolkit, 'checkout', '--detach', $upstreamCommit)
 }
 $actualCommit = (& git -C $toolkit rev-parse HEAD).Trim()
@@ -69,7 +69,7 @@ if (Test-Patch) {
 
 if (-not (Test-Path -LiteralPath $dsp56300)) {
     $null = New-Item -ItemType Directory -Path (Split-Path -Parent $dsp56300) -Force
-    Invoke-Checked git @('clone', '--depth', '1', '--branch', 'v1.0.0', 'https://github.com/mborgerson/dsp56300.git', $dsp56300)
+    Invoke-Checked git @('clone', '--depth', '1', '--branch', 'v1.0.0', 'https://github.com/marianodparisi/dsp56300.git', $dsp56300)
 }
 $actualDspCommit = (& git -C $dsp56300 rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $actualDspCommit -ne $dsp56300Commit) {

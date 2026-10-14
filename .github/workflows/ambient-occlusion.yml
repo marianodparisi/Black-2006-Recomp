@@ -27,7 +27,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Path third_party -Force | Out-Null
-          git clone https://github.com/sp00nznet/xboxrecomp.git third_party/xboxrecomp
+          git clone https://github.com/marianodparisi/xboxrecomp.git third_party/xboxrecomp
           if ($LASTEXITCODE -ne 0) { throw 'Runtime clone failed' }
           git -C third_party/xboxrecomp checkout --detach 766ecefcd7fb2a9b344de8ec891f6fe9ea14261b
           if ($LASTEXITCODE -ne 0) { throw 'Pinned checkout failed' }
@@ -40,7 +40,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Path .work -Force | Out-Null
-          git clone https://github.com/mborgerson/dsp56300.git .work/err009-dsp56300
+          git clone https://github.com/marianodparisi/dsp56300.git .work/err009-dsp56300
           if ($LASTEXITCODE -ne 0) { throw 'DSP56300 clone failed' }
           git -C .work/err009-dsp56300 checkout --detach aab3649fc452daf03da8b5e36fdc0c308d874101
           if ($LASTEXITCODE -ne 0) { throw 'Pinned DSP56300 checkout failed' }

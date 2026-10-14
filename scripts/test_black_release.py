@@ -108,3 +108,38 @@ def test_release_seeds_and_header():
         assert "#define BLACK_RELEASE_PAL 1" in header
         assert "#define BLACK_POST_SHIFT 0x20u" in header
     assert "#define BLACK_RELEASE_PAL 0" in NTSC.header()
+
+
+# Hand-written sources only: black_release.h defines the layout itself, and
+# black_xmv_idct.inc is generated from the local XBE at its real addresses.
+MANUAL_SOURCES = sorted(
+    path for pattern in ("recomp_manual.c", "black_*.inc", "black_*.h")
+    for path in (Path(__file__).resolve().parents[1] / "src").glob(pattern)
+    if path.name not in {"black_release.h", "black_xmv_idct.inc"})
+
+
+def test_manual_code_wraps_every_moving_address():
+    # A literal guest address that moves in PAL must be written BLACK_VA(...),
+    # or the PAL build silently reads the NTSC location. After merging new
+    # hooks, wrap whatever this reports.
+    assert MANUAL_SOURCES
+    problems = []
+    for path in MANUAL_SOURCES:
+        for line, literal in black_release.unwrapped_addresses(path.read_text(encoding="utf-8")):
+            problems.append(f"{path.name}:{line}: {literal}")
+    assert not problems, "Wrap these in BLACK_VA():\n" + "\n".join(problems)
+
+
+def test_unwrapped_address_scanner():
+    code = "\n".join((
+        "x = GUEST32(0x2D67F4u);",               # data, moves by 0x20
+        "y = GUEST32(BLACK_VA(0x2D67F4u));",     # wrapped
+        "z = BLACK_VA( 0x0012B4EFu );",          # wrapped, spaces
+        "/* GUEST32(0x2D67F4u) */ w = 0x5CB0;",  # comment; small offset
+        "s = \"0x2D67F4\"; c = 0xD8D90u;",       # string; text before the cut
+        "r = 0x0012B4EFu;",                     # .text after the cut, moves by 0x30
+        "q = 0x117000u;",                       # unresolved window: never guessed
+    ))
+    assert black_release.unwrapped_addresses(code) == [
+        (1, "0x2D67F4u"), (6, "0x0012B4EFu"), (7, "0x117000u")]
+    assert black_release.unwrapped_addresses(code, NTSC) == []

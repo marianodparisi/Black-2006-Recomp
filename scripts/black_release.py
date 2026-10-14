@@ -118,6 +118,53 @@ class Release:
 
 
 SYMBOL = re.compile(r"\b(sub|loc)_([0-9A-Fa-f]{8})(?![0-9A-Fa-f])")
+C_LITERAL = re.compile(r"(?<![\w.])0x([0-9A-Fa-f]+)[uUlL]*(?![\w.])")
+
+
+def _mask_comments_and_strings(text):
+    """Blank C comments and string/char literals, keeping offsets and lines."""
+    out, i = [], 0
+    while i < len(text):
+        if text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            end = len(text) if end < 0 else end + 2
+        elif text.startswith("//", i):
+            end = text.find("\n", i)
+            end = len(text) if end < 0 else end
+        elif text[i] in "\"'":
+            end = i + 1
+            while end < len(text) and text[end] != text[i] and text[end] != "\n":
+                end += 2 if text[end] == "\\" else 1
+            end += 1
+        else:
+            out.append(text[i])
+            i += 1
+            continue
+        out.append("".join(c if c == "\n" else " " for c in text[i:end]))
+        i = end
+    return "".join(out)
+
+
+def unwrapped_addresses(text, release=None):
+    """Hand-written C literals that would move in a release but skip BLACK_VA.
+
+    Returns (line, literal) pairs. Every such value in recomp_manual.c and its
+    includes is a canonical guest address, so it must be written BLACK_VA(...)
+    to reach the right place in the PAL image.
+    """
+    release = release or PAL
+    code = _mask_comments_and_strings(text)
+    found = []
+    for match in C_LITERAL.finditer(code):
+        value = int(match[1], 16)
+        try:
+            moves = release.to_guest(value) != value
+        except ValueError:
+            moves = True  # inside the unresolved window: never guess
+        if not moves or re.search(r"BLACK_VA\(\s*$", code[max(0, match.start() - 32):match.start()]):
+            continue
+        found.append((code.count("\n", 0, match.start()) + 1, match[0]))
+    return found
 
 NTSC = Release(
     name="ntsc",

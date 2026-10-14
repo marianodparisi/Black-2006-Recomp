@@ -7,6 +7,19 @@
 - Correr **BLACK (Criterion, 2006)** nativo en PC a partir de la copia PAL europea de Xbox del usuario. Después, mejorar los gráficos sobre el renderer D3D11: sombras, texturas, AA, FSR.
 - Es un proyecto personal. Por ahora el usuario prefiere **probar en su PC con Windows antes de publicar nada upstream**: nada de issues ni PRs sin pedírselo.
 
+## Desarrollo independiente
+
+- `pal-support` es la rama principal del fork. El repo original (`upstream`) no hace falta; sus cambios se traen solo si el usuario lo pide: `git fetch upstream` y `git merge upstream/main`.
+- Las dependencias del build también son forks del usuario, con una rama `black-pinned` que fija el commit:
+  - `marianodparisi/xboxrecomp`: commit `766ecef`. Encima se aplica `patches/xboxrecomp.patch`.
+  - `marianodparisi/dsp56300`: tag `v1.0.0`, commit `aab3649`.
+  - `setup.ps1` y los workflows de CI clonan de ahí.
+  - En el README y en `NOTICE` quedan las URLs originales, como crédito y para citar las licencias MIT.
+- **Hooks nuevos en `recomp_manual.c` o `src/black_*`:** toda dirección literal de `.text` posterior al corte, de `.rdata`, de `.data` o de BSS va como `BLACK_VA(0x…)`, escrita en NTSC.
+  - `test_manual_code_wraps_every_moving_address` (en `scripts/test_black_release.py`) falla si alguna queda sin envolver y dice archivo y línea.
+  - Contra el `recomp_manual.c` original del autor detecta las 119 direcciones que hubo que envolver.
+  - Los marcadores de hooks en `generate.py` con literales van por `RELEASE.text("…{0x…}…")`.
+
 ## Reglas
 
 - **Nunca commitear ni subir archivos del juego** (`.xbe`, `GlobData.bin`, `levels/`, `sound/`, `videos/`, `language/`…) ni código generado a partir de ellos.
@@ -72,7 +85,7 @@ El NTSC es el **layout canónico**. Todo el código del repo sigue con direccion
 
 ## Verificado (en una Mac arm64, sin Windows)
 
-- `pytest scripts tests/localization`: 42 pasan; 3 se saltean porque piden PowerShell.
+- `pytest scripts tests/localization`: 44 pasan; 3 se saltean porque piden PowerShell.
 - `generate.py` contra el XBE PAL real:
   - Termina sin errores: 13.805 funciones, 0 marcadores de falla.
   - Cada hook se aplicó la cantidad de veces esperada.
