@@ -7718,10 +7718,18 @@ index 4fd7692..0ab0e1b 100644
      if (unresolved > 0) {
          xbox_log(XBOX_LOG_WARN, XBOX_LOG_THUNK,
 diff --git a/src/kernel/kernel_xbox.c b/src/kernel/kernel_xbox.c
-index 4ebdfb9..60b3444 100644
+index 4ebdfb9..e7a8715 100644
 --- a/src/kernel/kernel_xbox.c
 +++ b/src/kernel/kernel_xbox.c
-@@ -72,6 +72,56 @@ XBOX_ANSI_STRING xbox_XeImageFileName = {
+@@ -10,6 +10,7 @@
+  */
+
+ #include "kernel.h"
++#include <stdlib.h>
+ #include <string.h>
+
+ /* ============================================================================
+@@ -72,6 +73,77 @@ XBOX_ANSI_STRING xbox_XeImageFileName = {
  static XBOX_LAUNCH_DATA_PAGE g_launch_data_page = {0};
  XBOX_LAUNCH_DATA_PAGE* xbox_LaunchDataPage = &g_launch_data_page;
 
@@ -7744,10 +7752,31 @@ index 4ebdfb9..60b3444 100644
 +    return ~(ULONG)sum;
 +}
 +
++/* The console language (XC_LANGUAGE): 1 English, 2 Japanese, 3 German,
++ * 4 French, 5 Spanish, 6 Italian, 7 Korean, 8 Chinese, 9 Portuguese.
++ * RECOMP_XBOX_LANGUAGE selects one; titles with official banks for it then
++ * load their own localized text. Anything else keeps English. */
++static ULONG xbox_console_language(void)
++{
++    const char* setting = getenv("RECOMP_XBOX_LANGUAGE");
++    char* end = NULL;
++    unsigned long language;
++
++    if (!setting || !*setting)
++        return 1;
++    language = strtoul(setting, &end, 10);
++    if (*end || language < 1 || language > 9) {
++        xbox_log(XBOX_LOG_WARN, XBOX_LOG_XBOX,
++            "RECOMP_XBOX_LANGUAGE=%s is not a console language (1-9); using English", setting);
++        return 1;
++    }
++    return (ULONG)language;
++}
++
 +static void xbox_make_default_eeprom(UCHAR image[256])
 +{
 +    LONG timezone_bias = -300;
-+    ULONG language = 1;
++    ULONG language = xbox_console_language();
 +    ULONG video = XC_VIDEO_FLAGS_WIDESCREEN | XC_VIDEO_FLAGS_HDTV;
 +    ULONG audio = 0;
 +    ULONG parental = 0;
@@ -7778,7 +7807,7 @@ index 4ebdfb9..60b3444 100644
  /* ============================================================================
   * Section Loading
   *
-@@ -134,6 +184,16 @@ NTSTATUS __stdcall xbox_ExQueryNonVolatileSetting(
+@@ -134,11 +206,21 @@ NTSTATUS __stdcall xbox_ExQueryNonVolatileSetting(
      xbox_log(XBOX_LOG_DEBUG, XBOX_LOG_XBOX,
          "ExQueryNonVolatileSetting: index=0x%02X len=%u", ValueIndex, ValueLength);
 
@@ -7794,8 +7823,15 @@ index 4ebdfb9..60b3444 100644
 +
      switch (ValueIndex) {
      case XC_LANGUAGE:
-         /* English = 1 */
-@@ -193,6 +253,28 @@ NTSTATUS __stdcall xbox_ExQueryNonVolatileSetting(
+-        /* English = 1 */
++        /* English = 1 unless RECOMP_XBOX_LANGUAGE selects another */
+         if (ValueLength >= sizeof(ULONG)) {
+-            *(PULONG)Value = 1;
++            *(PULONG)Value = xbox_console_language();
+             if (Type) *Type = 4; /* REG_DWORD */
+             if (ResultLength) *ResultLength = sizeof(ULONG);
+         }
+@@ -193,6 +275,28 @@ NTSTATUS __stdcall xbox_ExQueryNonVolatileSetting(
          }
          break;
 

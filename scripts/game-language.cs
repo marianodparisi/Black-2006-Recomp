@@ -4,6 +4,41 @@ using System.Security.Cryptography;
 
 namespace BlackXboxLauncher
 {
+    // The retail release in game\, by default.xbe hash. scripts\black_release.py
+    // describes how their layouts differ.
+    internal static class GameRelease
+    {
+        internal const string Ntsc = "NTSC";
+        internal const string Pal = "PAL";
+        internal const string NtscSha256 = "DF2739C372D254A90AEECCF5971D12097F22D89FBB90DB021FDA96DD4DEB68F6";
+        internal const string PalSha256 = "67F35121CCF622E7A293C402219596FE6456CA4C3D27E6F8139E449264DA30F0";
+
+        internal static string FromSha256(string sha256)
+        {
+            if (String.Equals(sha256, NtscSha256, StringComparison.OrdinalIgnoreCase)) return Ntsc;
+            if (String.Equals(sha256, PalSha256, StringComparison.OrdinalIgnoreCase)) return Pal;
+            return null;
+        }
+
+        internal static string XbePath(string root)
+        {
+            return Path.Combine(Path.GetFullPath(root), "game", "default.xbe");
+        }
+
+        internal static string Sha256(string root)
+        {
+            using (var hash = SHA256.Create())
+            using (var stream = File.OpenRead(XbePath(root)))
+                return BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", "");
+        }
+
+        // The release, or null when default.xbe is missing or not a supported one.
+        internal static string Detect(string root)
+        {
+            return File.Exists(XbePath(root)) ? FromSha256(Sha256(root)) : null;
+        }
+    }
+
     internal static class GameLanguageBanks
     {
         internal const string English = "en-US";
@@ -28,6 +63,35 @@ namespace BlackXboxLauncher
         internal static bool IsMachineDraft(string language)
         {
             return language == Spanish || language == French || language == German || language == Italian;
+        }
+
+        // The PAL disc carries official UK, French, German, Italian and Spanish
+        // banks. The game picks one from the console language (XC_LANGUAGE), so
+        // nothing is installed. Others fall back to the official English text.
+        internal static int ConsoleLanguage(string language)
+        {
+            switch (language)
+            {
+                case German: return 3;
+                case French: return 4;
+                case Spanish: return 5;
+                case Italian: return 6;
+                default: return 1;
+            }
+        }
+
+        internal static string DisplayName(string language, string release)
+        {
+            if (release != GameRelease.Pal) return DisplayName(language);
+            switch (language)
+            {
+                case PortugueseBrazil: return "Português (Brasil) - English game text on PAL";
+                case Spanish: return "Español (official)";
+                case French: return "Français (official)";
+                case German: return "Deutsch (official)";
+                case Italian: return "Italiano (official)";
+                default: return "English (official UK)";
+            }
         }
 
         internal static string DisplayName(string language)

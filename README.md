@@ -154,6 +154,13 @@ banks under `local/language-banks/` when the preserved English bank is present. 
 bank is included in Git. A missing selected bank leaves the installed text
 unchanged, and a new or invalid language setting defaults to English.
 
+The PAL disc includes official English (UK), French, German, Italian and Spanish
+banks and picks one from the console language. With PAL files the launcher does
+not install banks: it passes the selected language to the runtime as
+`RECOMP_XBOX_LANGUAGE` (3 German, 4 French, 5 Spanish, 6 Italian; otherwise 1,
+English). Brazilian Portuguese has no PAL bank, so it keeps the English game
+text while the launcher and keyboard prompts stay in Portuguese.
+
 Nine spoken cutscenes have subtitle tracks in English, Brazilian Portuguese,
 Spanish, French, German, and Italian. The runtime selects a track using the game
 language and lays captions out inside the active picture area, including 4:3,

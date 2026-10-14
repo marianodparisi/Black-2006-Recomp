@@ -101,6 +101,28 @@ namespace BlackXboxLauncher
             Expect<FileNotFoundException>(delegate { GameLanguageBanks.Install(root, GameLanguageBanks.English); }, check, "game\\language\\strings");
             Same(GameLanguageBanks.BankPath(root, GameLanguageBanks.English), English, check, "A missing target does not change the staged English source.");
             Clean(root, check);
+
+            ReleaseLanguage(fixture, check);
+        }
+
+        // The PAL disc picks its official bank from the console language.
+        private static void ReleaseLanguage(string fixture, Action<bool, string> check)
+        {
+            check(GameRelease.FromSha256(GameRelease.NtscSha256.ToLowerInvariant()) == GameRelease.Ntsc, "The NTSC XBE hash is recognized.");
+            check(GameRelease.FromSha256(GameRelease.PalSha256) == GameRelease.Pal, "The PAL XBE hash is recognized.");
+            check(GameRelease.FromSha256(new string('0', 64)) == null, "Other XBE hashes are not supported.");
+            check(GameRelease.Detect(Path.Combine(fixture, "no-game")) == null, "A missing XBE has no release.");
+
+            check(GameLanguageBanks.ConsoleLanguage(GameLanguageBanks.Spanish) == 5, "Spanish selects console language 5 (MainSp).");
+            check(GameLanguageBanks.ConsoleLanguage(GameLanguageBanks.French) == 4, "French selects console language 4 (MainFr).");
+            check(GameLanguageBanks.ConsoleLanguage(GameLanguageBanks.German) == 3, "German selects console language 3 (MainGe).");
+            check(GameLanguageBanks.ConsoleLanguage(GameLanguageBanks.Italian) == 6, "Italian selects console language 6 (MainIt).");
+            check(GameLanguageBanks.ConsoleLanguage(GameLanguageBanks.English) == 1 &&
+                  GameLanguageBanks.ConsoleLanguage(GameLanguageBanks.PortugueseBrazil) == 1, "Languages without a PAL bank keep English.");
+
+            check(GameLanguageBanks.DisplayName(GameLanguageBanks.Spanish, GameRelease.Pal).Contains("official") &&
+                  GameLanguageBanks.DisplayName(GameLanguageBanks.Spanish, GameRelease.Ntsc) == GameLanguageBanks.DisplayName(GameLanguageBanks.Spanish),
+                  "Only PAL describes its banks as official.");
         }
 
         private static string CreateGame(string fixture, string name, byte[] bank)

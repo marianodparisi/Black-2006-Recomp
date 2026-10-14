@@ -65,5 +65,22 @@ int main(void)
     failures += check(read_u32(eeprom + 0x60) == checksum(eeprom + 0x64, 0x5C),
                       "user checksum matches virtual settings section");
     failures += check(warning_count == 0, "full query does not emit an unhandled-index warning");
+
+    /* A PAL disc loads its official text bank for the console language. */
+    {
+        ULONG language = 0;
+        failures += check(_putenv("RECOMP_XBOX_LANGUAGE=5") == 0, "set Spanish console language");
+        status = xbox_ExQueryNonVolatileSetting(XC_LANGUAGE, &type, &language, sizeof(language), &length);
+        failures += check(status == STATUS_SUCCESS && language == 5, "XC_LANGUAGE follows RECOMP_XBOX_LANGUAGE");
+        xbox_ExQueryNonVolatileSetting(0xFFFF, &type, eeprom, sizeof(eeprom), &length);
+        failures += check(eeprom[0x90] == 5, "full EEPROM image agrees with XC_LANGUAGE");
+        failures += check(read_u32(eeprom + 0x60) == checksum(eeprom + 0x64, 0x5C),
+                          "user checksum covers the selected language");
+        failures += check(warning_count == 0, "a valid language does not warn");
+
+        failures += check(_putenv("RECOMP_XBOX_LANGUAGE=12") == 0, "set an invalid console language");
+        xbox_ExQueryNonVolatileSetting(XC_LANGUAGE, &type, &language, sizeof(language), &length);
+        failures += check(language == 1 && warning_count == 1, "an invalid language falls back to English with a warning");
+    }
     return failures ? 1 : 0;
 }

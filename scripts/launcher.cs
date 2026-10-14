@@ -782,7 +782,6 @@ namespace BlackXboxLauncher
 
     internal sealed class GameSession : IDisposable
     {
-        internal const string RetailHash = "DF2739C372D254A90AEECCF5971D12097F22D89FBB90DB021FDA96DD4DEB68F6";
         private Process process;
         private StreamWriter log;
         private VisualTraceLog visualTraceLog;
@@ -809,12 +808,10 @@ namespace BlackXboxLauncher
         {
             if (!File.Exists(Executable(root)))
                 throw new FileNotFoundException("The PC Release build is missing. Run scripts\\setup.ps1 to build it.", Executable(root));
-            string xbe = Path.Combine(root, "game", "default.xbe");
+            string xbe = GameRelease.XbePath(root);
             if (!File.Exists(xbe)) throw new FileNotFoundException("The original BLACK game executable is missing: game\\default.xbe.", xbe);
-            using (var hash = SHA256.Create())
-            using (var stream = File.OpenRead(xbe))
-                if (!BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", "").Equals(RetailHash, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("default.xbe does not match the retail BLACK release used by this PC recompilation.");
+            if (GameRelease.FromSha256(GameRelease.Sha256(root)) == null)
+                throw new InvalidDataException("default.xbe does not match a retail BLACK release supported by this PC recompilation.");
             if (!File.Exists(Path.Combine(root, "game", "GlobData.bin")) ||
                 !Directory.Exists(Path.Combine(root, "game", "levels")) ||
                 !Directory.Exists(Path.Combine(root, "game", "sound")) ||
@@ -880,6 +877,8 @@ namespace BlackXboxLauncher
             // a value there. GameSession.Start writes the file from these options just before the game starts.
             info.EnvironmentVariables["RECOMP_VIDEO_INI"] = LaunchOptions.VideoIniPath(root);
             info.EnvironmentVariables["RECOMP_LANGUAGE"] = options.MenuLanguage;
+            if (GameRelease.Detect(root) == GameRelease.Pal)
+                info.EnvironmentVariables["RECOMP_XBOX_LANGUAGE"] = GameLanguageBanks.ConsoleLanguage(options.MenuLanguage).ToString(CultureInfo.InvariantCulture);
             if (options.InfiniteAmmo) info.EnvironmentVariables["RECOMP_BLACK_INFINITE_AMMO"] = "1";
             if (options.SilverWeaponMode == "force-on") info.EnvironmentVariables["RECOMP_BLACK_SILVER_WEAPONS"] = "1";
             else if (options.SilverWeaponMode == "force-off") info.EnvironmentVariables["RECOMP_BLACK_SILVER_WEAPONS"] = "0";
@@ -927,7 +926,10 @@ namespace BlackXboxLauncher
                 int existing = ExistingProcess(root);
                 if (existing != 0) throw new InvalidOperationException("The PC game is already running (PID " + existing + "). Close that instance before starting another.");
                 options.Validate();
-                GameLanguageBanks.Install(root, options.MenuLanguage);
+                // NTSC has one English bank that the launcher replaces; the PAL
+                // game selects its own official bank (RECOMP_XBOX_LANGUAGE).
+                if (GameRelease.Detect(root) == GameRelease.Ntsc)
+                    GameLanguageBanks.Install(root, options.MenuLanguage);
                 Directory.CreateDirectory(Path.Combine(root, "save"));
                 session.DirectoryPath = Path.Combine(root, "reports", "launcher-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmssfffZ", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N").Substring(0, 8));
                 Directory.CreateDirectory(session.DirectoryPath);
@@ -952,7 +954,8 @@ namespace BlackXboxLauncher
                 using (var stream = File.OpenRead(info.FileName))
                     metadata["exeSha256"] = BitConverter.ToString(hash.ComputeHash(stream)).Replace("-", "");
                 metadata["workingDirectory"] = info.WorkingDirectory;
-                metadata["xbeSha256"] = RetailHash;
+                metadata["xbeSha256"] = GameRelease.Sha256(root);
+                metadata["gameRelease"] = GameRelease.Detect(root);
                 metadata["menuLanguage"] = options.MenuLanguage;
                 metadata["environment"] = environment;
                 metadata["visualTraceEnabled"] = options.VisualTraceEnabled;
@@ -1692,13 +1695,17 @@ namespace BlackXboxLauncher
             game.Controls.Add(threads);
             AddOptionLabel(game, new LaunchOptions().Threads + " default on this " + Environment.ProcessorCount + "-thread PC", 298, 77, 300).ForeColor = muted;
             AddOptionLabel(game, "Menu language", 14, 110, 176);
+            string release = null;
+            try { release = GameRelease.Detect(root); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
             ConfigureChoices(menuLanguage, "Game menu language", 194, 106, 408,
-                new DisplayChoice(GameLanguageBanks.English, GameLanguageBanks.DisplayName(GameLanguageBanks.English)),
-                new DisplayChoice(GameLanguageBanks.PortugueseBrazil, GameLanguageBanks.DisplayName(GameLanguageBanks.PortugueseBrazil)),
-                new DisplayChoice(GameLanguageBanks.Spanish, GameLanguageBanks.DisplayName(GameLanguageBanks.Spanish)),
-                new DisplayChoice(GameLanguageBanks.French, GameLanguageBanks.DisplayName(GameLanguageBanks.French)),
-                new DisplayChoice(GameLanguageBanks.German, GameLanguageBanks.DisplayName(GameLanguageBanks.German)),
-                new DisplayChoice(GameLanguageBanks.Italian, GameLanguageBanks.DisplayName(GameLanguageBanks.Italian)));
+                new DisplayChoice(GameLanguageBanks.English, GameLanguageBanks.DisplayName(GameLanguageBanks.English, release)),
+                new DisplayChoice(GameLanguageBanks.PortugueseBrazil, GameLanguageBanks.DisplayName(GameLanguageBanks.PortugueseBrazil, release)),
+                new DisplayChoice(GameLanguageBanks.Spanish, GameLanguageBanks.DisplayName(GameLanguageBanks.Spanish, release)),
+                new DisplayChoice(GameLanguageBanks.French, GameLanguageBanks.DisplayName(GameLanguageBanks.French, release)),
+                new DisplayChoice(GameLanguageBanks.German, GameLanguageBanks.DisplayName(GameLanguageBanks.German, release)),
+                new DisplayChoice(GameLanguageBanks.Italian, GameLanguageBanks.DisplayName(GameLanguageBanks.Italian, release)));
             game.Controls.Add(menuLanguage);
             SetSettingsTip(menuLanguage, "Selects the game's text bank. The launcher installs this choice before each run; English is selected by default.");
             skipMovies.SetBounds(14, 142, 590, 28);
