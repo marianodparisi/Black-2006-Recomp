@@ -4066,7 +4066,7 @@ new file mode 100644
 index 0000000..11631b9
 --- /dev/null
 +++ b/src/input/pc_input.c
-@@ -0,0 +1,1508 @@
+@@ -0,0 +1,1515 @@
 +/*
 + * pc_input.c -- native keyboard and mouse for BLACK. See pc_input.h for the design.
 + *
@@ -4111,6 +4111,7 @@ index 0000000..11631b9
 +#define PC_WHEEL_MS 110
 +#define PC_PULSE_MS 150
 +#define PC_GAMEPLAY_MS 400              /* startup fallback and evidence for a new movement hold in a frame gap */
++#define PC_GAMEPLAY_GAP_MS 150          /* frames finished without a camera update that still count as gameplay */
 +#define PC_PENDING_MS 5000             /* safety expiry for a stalled/disconnected native consumer */
 +#define PC_PENDING_MAX 4               /* bounded distinct presses awaiting native samples */
 +#define PC_NATIVE_SAMPLE_MAX 4         /* bounded snapshots; stale completions cannot acknowledge new input */
@@ -4696,10 +4697,16 @@ index 0000000..11631b9
 +{
 +    const int seen = InterlockedExchange(&s_gameplay_seen, 0) != 0;
 +    const int blocked = movie_active() || (s_gameplay_blocked_query && s_gameplay_blocked_query());
++    const uint64_t tick = (uint64_t)s_gameplay_tick, now = now_ms();
++    /* Below full speed the renderer often completes a frame before the next
++     * camera update. A gap that short is still gameplay: ending it would
++     * release the pointer and discard the mouse motion gathered meanwhile.
++     * Pause and movies stay immediate; focus loss clears the tick. */
++    const int recent = tick && now >= tick && now - tick <= PC_GAMEPLAY_GAP_MS;
 +    pc_input_init();
 +    InterlockedExchange(&s_frame_authority, 1);
 +    if (blocked) InterlockedExchange64(&s_gameplay_tick, 0);
-+    if (!seen || blocked) {
++    if ((!seen && !recent) || blocked) {
 +        unsigned id;
 +        InterlockedExchange(&s_gameplay_active, 0);
 +        InterlockedExchange(&s_dx, 0); InterlockedExchange(&s_dy, 0);
