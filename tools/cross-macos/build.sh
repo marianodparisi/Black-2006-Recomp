@@ -10,7 +10,7 @@
 #   third_party/xboxrecomp at the pinned commit with patches/xboxrecomp.patch applied,
 #   then tools/cross-macos/xboxrecomp-clang-cl.patch on top of it;
 #   src/recomp/gen from scripts/generate.py.
-# Build from a separate worktree that also has repo-clang-cl.patch applied, so
+# Build from a separate worktree that also has repo-clang-cl.diff applied, so
 # this branch stays clean: both patches only fix MSVC-tolerated issues clang rejects.
 #
 # Usage: tools/cross-macos/build.sh <source dir> <build dir> [ninja args]

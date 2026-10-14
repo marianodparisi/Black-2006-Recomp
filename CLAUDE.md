@@ -88,7 +88,7 @@ El NTSC es el **layout canónico**. Todo el código del repo sigue con direccion
     - `qemu_shim.h` redefine `__builtin_ctz` y `__builtin_clz`.
     - `recomp_manual.c` redeclara `mcpx_apu_mmio_read` y `mcpx_apu_mmio_write` con `void *` en lugar de `MCPXAPUState *`.
     - Además, `main.c` usa `recomp_dispatch_init` sin declararla. Eso se resuelve con `-Wno-error=implicit-function-declaration` en el toolchain.
-  - Los arreglos están en `tools/cross-macos/*.patch` y se aplican **solo** en un worktree aparte, no en esta rama. Cómo armarlo: `tools/cross-macos/build.sh`.
+  - Los arreglos están en `tools/cross-macos/` (`xboxrecomp-clang-cl.patch` y `repo-clang-cl.diff`, que conserva sus CRLF) y se aplican **solo** en un worktree aparte, no en esta rama. Cómo armarlo: `tools/cross-macos/build.sh`.
 
 ## Pendiente
 
