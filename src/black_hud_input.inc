@@ -125,8 +125,8 @@ static int black_hint_current(uint32_t hud)
 {
     uint32_t owner;
     BlackHintCache *cache=&black_hint_cache;
-    if (!black_pc_ram_span(0x002D12E4u,4u)) return 0;
-    owner=GUEST32(0x002D12E4u);
+    if (!black_pc_ram_span(BLACK_VA(0x002D12E4u),4u)) return 0;
+    owner=GUEST32(BLACK_VA(0x002D12E4u));
     if (!black_pc_ram_span(owner,16u) || !black_pc_ram_span(hud,0x2B20u) ||
         hud!=GUEST32(owner+12u)) return 0;
     if (cache->hud!=hud || cache->owner!=owner) {
@@ -151,14 +151,14 @@ static int black_hint_tokens(const uint16_t *text, unsigned capacity)
         if (character==0xF025u) control=16u;
         else {
             if (!map) {
-                if (!black_pc_ram_span(0x002F3BD4u,4u)) return 0;
-                map=GUEST32(0x002F3BD4u);
+                if (!black_pc_ram_span(BLACK_VA(0x002F3BD4u),4u)) return 0;
+                map=GUEST32(BLACK_VA(0x002F3BD4u));
                 if (!black_pc_ram_span(map,37u*4u)) return 0;
             }
             control=GUEST32(map+(character-0xF000u)*4u);
         }
-        if (control>=28u || !black_pc_ram_span(0x002AC290u+control*4u,4u)) return 0;
-        name=GUEST32(0x002AC290u+control*4u);
+        if (control>=28u || !black_pc_ram_span(BLACK_VA(0x002AC290u)+control*4u,4u)) return 0;
+        name=GUEST32(BLACK_VA(0x002AC290u)+control*4u);
         for (n=0; n<64u; ++n) {
             unsigned char byte;
             if (!black_pc_ram_span(name+n,1u)) return 0;
@@ -177,8 +177,8 @@ static BlackHintField *black_hint_capture(uint32_t caller, uint32_t buffer, int 
     BlackHintField *field;
     uint32_t hud=g_ebx, id;
     unsigned capacity;
-    if (caller==0x0012B4EFu) capacity=BLACK_HINT_BODY;
-    else if (caller==0x0012B4E0u) capacity=BLACK_HINT_CONTINUE;
+    if (caller==BLACK_VA(0x0012B4EFu)) capacity=BLACK_HINT_BODY;
+    else if (caller==BLACK_VA(0x0012B4E0u)) capacity=BLACK_HINT_CONTINUE;
     else return NULL;
     if (!black_hint_current(hud) ||
         buffer!=hud+(capacity==BLACK_HINT_BODY?0x2114u:0x22C0u)) return NULL;
@@ -213,8 +213,8 @@ static int black_hint_format(const BlackHintField *field, int device, uint16_t *
     int result=0;
     const int previous_native_formatting=black_hint_native_formatting;
     if (!field->valid || !black_hint_tokens(field->raw,field->capacity) ||
-        !black_pc_ram_span(0x002D45D8u,4u) ||
-        !black_pc_ram_span(GUEST32(0x002D45D8u),16u) ||
+        !black_pc_ram_span(BLACK_VA(0x002D45D8u),4u) ||
+        !black_pc_ram_span(GUEST32(BLACK_VA(0x002D45D8u)),16u) ||
         g_fs_base!=0x4000u ||
         VirtualQuery((void *)tib,&mapping,sizeof(mapping))!=sizeof(mapping) ||
         mapping.State!=MEM_COMMIT || (mapping.Protect&(PAGE_GUARD|PAGE_NOACCESS)) ||
@@ -245,7 +245,7 @@ static int black_hint_format(const BlackHintField *field, int device, uint16_t *
                 pc_input_expand_prompt((uint16_t *)((uintptr_t)g_xbox_mem_offset+text),field->capacity,field->confirm_only);
             /* At most 199 source units, each native replacement converted with limit32.
              * Even 199*32+1 UTF-16 units fits this separate6400-unit allocation. */
-            g_esp=stack-8u; GUEST32(g_esp)=0x0012B4EFu; GUEST32(g_esp+4u)=text;
+            g_esp=stack-8u; GUEST32(g_esp)=BLACK_VA(0x0012B4EFu); GUEST32(g_esp+4u)=text;
             g_df=0;
             black_hint_native_formatting=1;
             sub_00113BF0_gen();
@@ -290,8 +290,8 @@ static int black_pickup_glyph(int *control, uint16_t *glyph)
 {
     uint32_t map, value, index, name;
     unsigned char expected, byte;
-    if (!black_pc_ram_span(0x002F3BD4u,4u)) return 0;
-    map=GUEST32(0x002F3BD4u);
+    if (!black_pc_ram_span(BLACK_VA(0x002F3BD4u),4u)) return 0;
+    map=GUEST32(BLACK_VA(0x002F3BD4u));
     if (!black_pc_ram_span(map,37u*4u)) return 0;
     value=GUEST32(map+13u*4u);
     switch (value) {
@@ -301,10 +301,10 @@ static int black_pickup_glyph(int *control, uint16_t *glyph)
     case 18u: index=3u; expected=0xB3u; break;
     default: return 0;
     }
-    if (!black_pc_ram_span(0x002A7DD4u+index*4u,4u) ||
-        GUEST32(0x002A7DD4u+index*4u)!=value ||
-        !black_pc_ram_span(0x002AB72Cu+index*4u,4u)) return 0;
-    name=GUEST32(0x002AB72Cu+index*4u);
+    if (!black_pc_ram_span(BLACK_VA(0x002A7DD4u)+index*4u,4u) ||
+        GUEST32(BLACK_VA(0x002A7DD4u)+index*4u)!=value ||
+        !black_pc_ram_span(BLACK_VA(0x002AB72Cu)+index*4u,4u)) return 0;
+    name=GUEST32(BLACK_VA(0x002AB72Cu)+index*4u);
     if (!black_pc_ram_span(name,2u)) return 0;
     byte=*(const unsigned char *)((uintptr_t)g_xbox_mem_offset+name);
     if (byte!=expected || *(const unsigned char *)((uintptr_t)g_xbox_mem_offset+name+1u)) return 0;

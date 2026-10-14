@@ -17,7 +17,7 @@ static int black_menu_prompt_source(uint32_t source)
     uint32_t hash = 0xFFFFFFFFu, i;
     size_t prompt;
     const uint8_t *text;
-    if (!black_pc_ram_span(source, 9u) || !black_pc_ram_span(0x002AC908u, 1024u)) return 0;
+    if (!black_pc_ram_span(source, 9u) || !black_pc_ram_span(BLACK_VA(0x002AC908u), 1024u)) return 0;
     text = (const uint8_t *)((uintptr_t)g_xbox_mem_offset + source + 8u);
     if (text[0] != '$' && text[0] != '#') return 0;
     /* sub_001F3A80's key CRC uses arithmetic SAR, not a standard CRC32. */
@@ -32,7 +32,7 @@ static int black_menu_prompt_source(uint32_t source)
             return 0;
         }
         shifted = (hash >> 8u) | ((hash & 0x80000000u) ? 0xFF000000u : 0u);
-        hash = shifted ^ GUEST32(0x002AC908u + ((hash ^ character) & 255u) * 4u);
+        hash = shifted ^ GUEST32(BLACK_VA(0x002AC908u) + ((hash ^ character) & 255u) * 4u);
     }
     return 0;
 }

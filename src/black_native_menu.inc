@@ -325,7 +325,7 @@ static uint32_t bnm_hash(const char *s)
     for (; *s; s++) {
         const uint32_t i = ((c & 0xFFu) ^ (uint32_t)(int32_t)(signed char)*s) & 0xFFFFFFFFu;
         if (i > 255u) return 0;                         /* the game's keys are ASCII */
-        c = ((c >> 8) | ((c & 0x80000000u) ? 0xFF000000u : 0u)) ^ GUEST32(0x002AC908u + i * 4u);
+        c = ((c >> 8) | ((c & 0x80000000u) ? 0xFF000000u : 0u)) ^ GUEST32(BLACK_VA(0x002AC908u) + i * 4u);
     }
     return c;
 }
@@ -341,7 +341,7 @@ static int bnm_guest_call(void (*fn)(void), uint32_t eax, const uint32_t *args, 
     unsigned i;
     if (s_esp < 0x20000u || !black_pc_ram_span(sp - 4u * (n + 1u), 4u * (n + 1u) + 0x200u)) return 0;
     for (i = n; i-- > 0;) { sp -= 4u; GUEST32(sp) = args[i]; }
-    sp -= 4u; GUEST32(sp) = 0x00124330u;              /* returns into the front-end update, like its own calls */
+    sp -= 4u; GUEST32(sp) = BLACK_VA(0x00124330u);              /* returns into the front-end update, like its own calls */
     g_esp = sp; g_eax = eax;
     fn();
     result = g_eax;
@@ -389,7 +389,7 @@ static uint32_t bnm_bound(uint32_t ui, uint32_t table_offset, uint32_t hash, uin
 static uint32_t bnm_string_from_manager(uint32_t tm, uint32_t hash)
 {
     unsigned t;
-    if (!tm || !black_pc_ram_span(0x002F3B0Eu, 1u) || !*(const uint8_t *)((uintptr_t)g_xbox_mem_offset + 0x002F3B0Eu) ||
+    if (!tm || !black_pc_ram_span(BLACK_VA(0x002F3B0Eu), 1u) || !*(const uint8_t *)((uintptr_t)g_xbox_mem_offset + BLACK_VA(0x002F3B0Eu)) ||
         !black_pc_ram_span(tm + 0xCE8u, 44u)) return 0;
     for (t = 0; t < 11u; t++) {
         const uint32_t table = GUEST32(tm + 0xCE8u + t * 4u);
@@ -416,7 +416,7 @@ static uint32_t bnm_string_from_manager(uint32_t tm, uint32_t hash)
 /* Native menu helpers without an explicit manager use BLACK's global instance. */
 static uint32_t bnm_string(uint32_t hash)
 {
-    const uint32_t tm = black_pc_ram_span(0x002D45D8u, 4u) ? GUEST32(0x002D45D8u) : 0u;
+    const uint32_t tm = black_pc_ram_span(BLACK_VA(0x002D45D8u), 4u) ? GUEST32(BLACK_VA(0x002D45D8u)) : 0u;
     return bnm_string_from_manager(tm, hash);
 }
 
@@ -685,7 +685,7 @@ static void black_native_menu_tick(uint32_t ui)
     char page[40];
     int ready, active;
     const unsigned caller_csr = _mm_getcsr();
-    if (!ui || ui != GUEST32(0x002D199Cu) || !black_pc_ram_span(ui, 0x3960u)) return;
+    if (!ui || ui != GUEST32(BLACK_VA(0x002D199Cu)) || !black_pc_ram_span(ui, 0x3960u)) return;
     {
         /* Lab only: RECOMP_MENU_GOTO=Page[@FromPage] asks the game for that page once the pause menu (or FromPage) has
          * been up for two seconds, with the native pages on or off -- to see pages a short scripted run cannot reach. */

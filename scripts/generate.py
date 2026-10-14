@@ -14,7 +14,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-EXPECTED_XBE = "DF2739C372D254A90AEECCF5971D12097F22D89FBB90DB021FDA96DD4DEB68F6"
+import black_release
+
+# Hooks are written against the canonical (NTSC) layout. main() selects the
+# local release; literal guest addresses in markers go through RELEASE.text.
+RELEASE = black_release.NTSC
 FUNCTION = re.compile(r"^void (\w+)\(void\)\n\{.*?^\}", re.M | re.S)
 # These late-added wrappers retain the generator's original register model.
 UNPROMOTED = {"xbe_entry_point", "sub_00102840_gen", "sub_00102D90_gen",
@@ -368,7 +372,7 @@ def title_hooks(name, body):
     if name == "sub_001DAFF0":
         body = replace_once(body, "if ((_fca <= _fcb)) goto loc_001DB18D;", "if (!(_fca > _fcb)) goto loc_001DB18D;")
     if name == "sub_0016EA90":
-        body = replace_once(body, "MEMF(0x295CA8)", "black_osc_factor()")
+        body = replace_once(body, RELEASE.text("MEMF({0x295CA8})"), "black_osc_factor()")
     if name == "sub_001BD3F0_gen":
         body, count = re.subn(r"(xmm[01]\.f\[0\] = xmm[01]\.f\[0\] \* )(MEMF\(l_esi \+ 0xCC\))", r"\1black_ctl_k(\2)", body)
         if count != 2:
@@ -426,8 +430,8 @@ def title_hooks(name, body):
 def scope_mask_boundary(name, body):
     """Retain the shape callback ABI and its native registration/dispatch route."""
     if name == "sub_00121CB0":
-        for marker in ("MEM32(0x562BD8) = 0x121B50;",
-                       "MEM32(0x562BA8) = 0x121BC0;"):
+        for marker in (RELEASE.text("MEM32({0x562BD8}) = {0x121B50};"),
+                       RELEASE.text("MEM32({0x562BA8}) = {0x121BC0};")):
             if body.count(marker) != 1:
                 raise ValueError("Native shape/glyph callback registration changed")
         return body
@@ -438,7 +442,7 @@ def scope_mask_boundary(name, body):
         branch = body[body.index(start):body.index(end)]
         markers = ("edx = MEM32(ebp + 0xC);", "eax = MEM32(ecx + 0x18);",
                    "PUSH32(esp, edx);", "PUSH32(esp, eax);",
-                   "_icall_target = MEM32(0x562BD8); PUSH32(esp, 0x00102D67u);")
+                   RELEASE.text("_icall_target = MEM32({0x562BD8}); PUSH32(esp, {0x00102D67u});"))
         previous = -1
         for marker in markers:
             if branch.count(marker) != 1 or branch.index(marker) <= previous:
@@ -449,8 +453,8 @@ def scope_mask_boundary(name, body):
         return body
     for marker in ("loc_00121B50: ;", "loc_00121B69: ;", "loc_00121B89: ;",
                    "loc_00121BA9: ;", "l_eax = MEM32(ebp + 0xC);",
-                   "RECOMP_ABI_CALL(0x000DA2B0u, sub_000DA2B0)",
-                   "RECOMP_ABI_CALL(0x000DA3A0u, sub_000DA3A0)"):
+                   RELEASE.text("RECOMP_ABI_CALL({0x000DA2B0u}, sub_000DA2B0)"),
+                   RELEASE.text("RECOMP_ABI_CALL({0x000DA3A0u}, sub_000DA3A0)")):
         if body.count(marker) != 1:
             raise ValueError("Native scope leaf draw boundary changed")
     for operand in ("l_edx = MEM32(ebp + 8);", "l_ecx = l_eax + 0x3740;"):
@@ -534,12 +538,12 @@ def viewmodel_hooks(name, body):
             raise ValueError("First-person draw exit changed")
         body = replace_once(body, returns[0], "    black_viewmodel_draw_end(black_vm_previous);\n" + returns[0])
     if name == "sub_0016F610" and "black_viewmodel_constants(l_edx);" not in body:
-        calls = [line for line in body.splitlines() if "PUSH32(l_esp, 0x0016F680u)" in line]
+        calls = [line for line in body.splitlines() if RELEASE.text("PUSH32(l_esp, {0x0016F680u})") in line]
         if len(calls) != 1 or "sub_00269930" not in calls[0]:
             raise ValueError("First-person projection upload changed")
         body = replace_once(body, calls[0], "    black_viewmodel_constants(l_edx);\n" + calls[0])
     if name == "sub_000D4A50" and "black_viewmodel_muzzle_constants(l_edx, black_vm_caller);" not in body:
-        calls = [line for line in body.splitlines() if "PUSH32(l_esp, 0x000D4AFDu)" in line]
+        calls = [line for line in body.splitlines() if RELEASE.text("PUSH32(l_esp, {0x000D4AFDu})") in line]
         if len(calls) != 1 or "sub_00269930" not in calls[0]:
             raise ValueError("First-person muzzle projection upload changed")
         body = replace_once(body, calls[0], "    black_viewmodel_muzzle_constants(l_edx, black_vm_caller);\n" + calls[0])
@@ -668,8 +672,8 @@ def audit_audio_completion_boundary(directory):
         (r"\bl_ecx = black_audio_queue_completion\(l_esi\);", 1),
         (r"(?m)^void sub_0021C7EF_gen\(void\)\s*\{", 1),
         (r"(?m)^void sub_0021C7EF\(void\)\s*\{", 0),
-        (r"RECOMP_ABI_CALL\(0x0021C7EFu, sub_0021C7EF\)", 1),
-        (r"\{ 0x0021C7EFu, \(recomp_func_t\)sub_0021C7EF \}", 1),
+        (RELEASE.text(r"RECOMP_ABI_CALL\({0x0021C7EFu}, sub_0021C7EF\)"), 1),
+        (RELEASE.text(r"\{ {0x0021C7EFu}, \(recomp_func_t\)sub_0021C7EF \}"), 1),
     )
     for pattern, count in contracts:
         if len(re.findall(pattern, text)) != count:
@@ -709,6 +713,38 @@ def write_post_transform_audit(generated, output, raw_summary_path):
     }
     raw_summary_path.write_text(json.dumps(raw_summary, indent=2) + "\n", encoding="utf-8")
     return audit
+
+
+def release_seeds(source, destination):
+    """The repository's seed functions, at the local release's addresses."""
+    if RELEASE.canonical:
+        return source
+    seeds = json.loads(source.read_text(encoding="utf-8"))
+    for seed in seeds:
+        seed["start"] = "0x%08X" % RELEASE.to_guest(int(seed["start"], 16))
+    destination.write_text(json.dumps(seeds, indent=2) + "\n", encoding="utf-8")
+    return destination
+
+
+def canonicalize_generated(directory):
+    """Rename generated sub_X/loc_X symbols to canonical (NTSC) addresses.
+
+    Hooks and recomp_manual.c select functions and labels by these names.
+    Literal guest addresses in the code are left at the release's values.
+    """
+    if RELEASE.canonical:
+        return
+    for path in sorted((*directory.glob("*.c"), *directory.glob("*.h"))):
+        text = path.read_text(encoding="utf-8")
+        renamed = RELEASE.rename_symbols(text)
+        if renamed != text:
+            path.write_text(renamed, encoding="utf-8")
+
+
+def write_release_header(destination):
+    text = RELEASE.header()
+    if not destination.is_file() or destination.read_text(encoding="utf-8") != text:
+        destination.write_text(text, encoding="utf-8")
 
 
 def command(toolkit, module, arguments):
@@ -769,17 +805,27 @@ def main():
     toolkit, xbe, output = args.toolkit.resolve(), args.xbe.resolve(), args.output.resolve()
     if not xbe.is_file():
         parser.error("Place the supported original Xbox BLACK files in game/ first")
-    if hashlib.sha256(xbe.read_bytes()).hexdigest().upper() != EXPECTED_XBE:
-        parser.error("The XBE does not match the supported retail release")
+    global RELEASE
+    release = black_release.detect(hashlib.sha256(xbe.read_bytes()).hexdigest())
+    if release is None:
+        parser.error("The XBE does not match a supported retail release")
+    RELEASE = release
+    print(f"Detected the {release.name.upper()} release", flush=True)
     work = root / ".work" / ("generate-" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ"))
     work.mkdir(parents=True)
     analysis = work / "xbe-analysis.json"
     disasm, identified, abi = work / "disasm", work / "func-id", work / "abi"
     manual = work / "manual-scan.c"
-    manual.write_text(flatten_manual(root / "src/recomp_manual.c"), encoding="utf-8")
+    # The recompiler skips and wraps functions by address, so it must see the
+    # local release's addresses. Generated names are made canonical below.
+    manual.write_text(RELEASE.guest_symbols(flatten_manual(root / "src/recomp_manual.c")),
+                      encoding="utf-8")
     command(toolkit, "tools.xbe_parser", [xbe, "--json", analysis])
     run_disasm(toolkit, xbe, analysis, disasm)
     feedback_db = args.icall_db.resolve()
+    if not RELEASE.canonical and feedback_db == (root / "local/icall_targets.json").resolve():
+        # Observed targets are guest addresses; keep each release's apart.
+        feedback_db = feedback_db.with_name(f"icall_targets.{RELEASE.name}.json")
     feedback_dumps = [path.resolve() for path in (args.icall_dump or [])]
     default_dump = root / "local/icall_targets.dump"
     if default_dump.is_file() and default_dump not in feedback_dumps:
@@ -788,7 +834,7 @@ def main():
     seed_files = []
     known_seeds = root / "scripts/icall_seed_functions.json"
     if known_seeds.is_file():
-        seed_files.append(known_seeds)
+        seed_files.append(release_seeds(known_seeds, work / "known-seeds.json"))
     if feedback_db.is_file():
         seeds = work / "icall-seeds.json"
         command(toolkit, "tools.recomp.icall_feedback",
@@ -804,6 +850,7 @@ def main():
     command(toolkit, "tools.abi_analysis", [xbe, "--disasm-dir", disasm, "--func-id-dir", identified, "--output-dir", abi])
     generated = work / "gen"
     command(toolkit, "tools.recomp", [xbe, "--all", "--split", "1000", "--game-name", "BLACK", "--disasm-dir", disasm, "--func-id-dir", identified, "--abi-dir", abi, "--gen-dir", generated, "--exclude-manual", manual, "--output-dir", work / "summary"])
+    canonicalize_generated(generated)
     chunks = sorted(generated.glob("recomp_[0-9]*.c"))
     emit_idct("\n".join(path.read_text(encoding="utf-8") for path in chunks), root / "src/black_xmv_idct.inc")
     declarations = "\nextern float black_osc_factor(void);\nextern float black_ctl_k(float);\nextern void black_movie_tag_flip(uint32_t);\nextern void black_pickup_text_ready(uint32_t);\nextern void black_weapon_trace(uint32_t, uint32_t);\nextern void black_weapon_model_trace(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);\nextern void black_weapon_attachment_trace(uint32_t, uint32_t);\nextern void black_viewmodel_muzzle_gate(uint32_t);\nextern void black_test_weapon_loadout(uint32_t);\nextern void black_viewmodel_owner(uint32_t);\nextern uint32_t black_viewmodel_draw_begin(uint32_t);\nextern void black_viewmodel_draw_end(uint32_t);\nextern void black_viewmodel_constants(uint32_t);\nextern void black_viewmodel_muzzle_constants(uint32_t, uint32_t);\n"
@@ -830,6 +877,7 @@ def main():
             if not destination.is_file() or destination.read_bytes() != path.read_bytes():
                 shutil.copyfile(path, destination)
 
+    write_release_header(output.parent / "black_release_gen.h")
     write_post_transform_audit(generated, output, work / "summary" / "summary.json")
     print(f"Generated {len(chunks)} source chunks from your XBE. Local analysis: {work}", flush=True)
 

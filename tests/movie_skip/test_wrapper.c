@@ -62,6 +62,7 @@ void xbox_IrqlLeaveDispatch(void)
 void sub_0021C7EF_gen(void)
 { fputs("Unexpected generated audio callback in movie fixture\n", stderr); abort(); }
 
+#define BLACK_VA(va) (va) /* fixtures use the canonical (NTSC) layout */
 #include "movie-wrapper-under-test.inc"
 #include "movie-font-under-test.inc"
 

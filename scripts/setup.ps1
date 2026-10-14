@@ -10,7 +10,11 @@ $dsp56300 = Join-Path $projectRoot '.work\err009-dsp56300'
 $upstreamCommit = '766ecefcd7fb2a9b344de8ec891f6fe9ea14261b'
 $dsp56300Commit = 'aab3649fc452daf03da8b5e36fdc0c308d874101'
 $xbe = Join-Path $projectRoot 'game\default.xbe'
-$expectedXbe = 'DF2739C372D254A90AEECCF5971D12097F22D89FBB90DB021FDA96DD4DEB68F6'
+# Supported retail releases; scripts\black_release.py describes their layouts.
+$supportedXbe = @{
+    'DF2739C372D254A90AEECCF5971D12097F22D89FBB90DB021FDA96DD4DEB68F6' = 'NTSC'
+    '67F35121CCF622E7A293C402219596FE6456CA4C3D27E6F8139E449264DA30F0' = 'PAL'
+}
 
 function Invoke-Checked([string]$Program, [string[]]$Arguments) {
     $previousPreference = $ErrorActionPreference
@@ -27,9 +31,11 @@ function Invoke-Checked([string]$Program, [string[]]$Arguments) {
 if (-not (Test-Path -LiteralPath $xbe -PathType Leaf)) {
     throw 'Copy your extracted original Xbox BLACK files into game\ first (including default.xbe).'
 }
-if ((Get-FileHash -LiteralPath $xbe -Algorithm SHA256).Hash -ne $expectedXbe) {
-    throw 'default.xbe does not match the supported retail Xbox release; see README.md.'
+$xbeHash = (Get-FileHash -LiteralPath $xbe -Algorithm SHA256).Hash
+if (-not $supportedXbe.ContainsKey($xbeHash)) {
+    throw 'default.xbe does not match a supported retail Xbox release; see README.md.'
 }
+Write-Output "Found the $($supportedXbe[$xbeHash]) release of BLACK."
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'Git must be installed and available on PATH.' }
 if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) { throw 'CMake 3.20 or later must be installed and available on PATH.' }
 

@@ -16,6 +16,7 @@ static void *xbox_GetMemoryBase(void) { return ram; }
 static size_t xbox_GetMappedSize(void) { return RAM_BYTES; }
 static void *xbox_GetPhysicalMemoryBase(void) { return NULL; }
 #define GUEST32(a) (*(uint32_t *)(ram+(a)))
+#define BLACK_VA(va) (va) /* fixtures use the canonical (NTSC) layout */
 static unsigned checks;
 #define CHECK(x) do { ++checks; if(!(x)) { fprintf(stderr,"FAIL %d: %s\n",__LINE__,#x); exit(1); } } while(0)
 #include "trace.extracted.inc"

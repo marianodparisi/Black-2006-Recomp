@@ -97,17 +97,21 @@ Requirements:
 - Visual Studio 2022 with **Desktop development with C++** and a Windows SDK.
 - Git, CMake 3.20 or newer, and Python 3.10 or newer (`py -3`).
 - Rustup with the `x86_64-pc-windows-msvc` toolchain (the pinned DSP build uses Rust 1.98.1).
-- The supported retail original Xbox release of BLACK, extracted into `game/`.
+- A supported retail original Xbox release of BLACK, extracted into `game/`.
 
-The supported `game/default.xbe` has SHA-256:
+Two releases are supported, identified by the SHA-256 of `game/default.xbe`:
 
 ```text
-DF2739C372D254A90AEECCF5971D12097F22D89FBB90DB021FDA96DD4DEB68F6
+DF2739C372D254A90AEECCF5971D12097F22D89FBB90DB021FDA96DD4DEB68F6  NTSC (North America)
+67F35121CCF622E7A293C402219596FE6456CA4C3D27E6F8139E449264DA30F0  PAL (Europe)
 ```
 
-Keep the extracted disc layout intact, including `GlobData.bin`, `levels/`,
-`sound/`, and `videos/`. Other releases and the PlayStation 2 version are not
-supported by this build.
+The PAL `.text` section is 0x30 bytes longer and every later section moves by
+0x20. Hooks and hand-written code keep NTSC addresses: generation renames the
+recompiled functions to them, and `BLACK_VA` maps literal guest addresses to the
+local release (see `scripts/black_release.py`). Keep the extracted disc layout
+intact, including `GlobData.bin`, `levels/`, `sound/`, and `videos/`. Other
+releases and the PlayStation 2 version are not supported by this build.
 
 From PowerShell in this repository:
 

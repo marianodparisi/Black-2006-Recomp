@@ -33,6 +33,7 @@
 #include "pc_movie_skip.h"
 #include "pc_menu.h"
 #include "black_menu_prompt_language.h"
+#include "black_release.h"
 
 /* ── ICALL trace ring buffer ───────────────────────────────── */
 
@@ -242,9 +243,9 @@ static int black_movie_skip_identify(uint32_t movie_va, BlackMovieSkipIdentity *
     const uint8_t *movie;
     const char *stem;
     memset(out, 0, sizeof(*out));
-    if (!black_pc_ram_span(0x002D45F0u, 4u) ||
+    if (!black_pc_ram_span(BLACK_VA(0x002D45F0u), 4u) ||
         !black_pc_ram_span(movie_va, 0x68u)) return 0;
-    main = GUEST32(0x002D45F0u);
+    main = GUEST32(BLACK_VA(0x002D45F0u));
     if (!black_pc_ram_span(main, 0x20428u)) return 0;
     manager = main + 0x2026Cu;
     movie = (const uint8_t *)((uintptr_t)g_xbox_mem_offset + movie_va);
@@ -412,13 +413,13 @@ static int black_hz60_enabled(void)
 
 void sub_00178350(void)
 {
-    if (black_hz60_enabled() && *(volatile uint8_t *)((uintptr_t)g_xbox_mem_offset + 0x002D198Cu) == 0 &&
-        GUEST32(0x002F3A38u) == 0x3D088889u) {
+    if (black_hz60_enabled() && *(volatile uint8_t *)((uintptr_t)g_xbox_mem_offset + BLACK_VA(0x002D198Cu)) == 0 &&
+        GUEST32(BLACK_VA(0x002F3A38u)) == 0x3D088889u) {
         float step = 1.0f / (float)black_hz;
         uint32_t bits;
         memcpy(&bits, &step, sizeof(bits));
         if (black_hz == 60) bits = 0x3C888889u;                /* the value earlier builds wrote */
-        GUEST32(0x002F3A38u) = bits;
+        GUEST32(BLACK_VA(0x002F3A38u)) = bits;
         black_step_halved = 1;
         black_vblank_hz_v = black_hz;
         {
@@ -436,7 +437,7 @@ void sub_00178350(void)
 
 float black_osc_factor(void)
 {
-    uint32_t bits = black_step_halved ? 0x3C23D70Au : GUEST32(0x00295CA8u);   /* 0.01f */
+    uint32_t bits = black_step_halved ? 0x3C23D70Au : GUEST32(BLACK_VA(0x00295CA8u));   /* 0.01f */
     float f;
     memcpy(&f, &bits, sizeof(f));
     if (black_step_halved) f *= 30.0f / (float)black_hz;       /* a power of two: exact */
@@ -590,13 +591,13 @@ static void black_sim_log(void)
     }
     if (!every || ++count % (unsigned)every) return;
     {
-        uint32_t timer = GUEST32(0x002D45D4u), bits, tick = GUEST32(0x002F4368u);
+        uint32_t timer = GUEST32(BLACK_VA(0x002D45D4u)), bits, tick = GUEST32(BLACK_VA(0x002F4368u));
         float seconds, step, dt;
         LARGE_INTEGER now;
         QueryPerformanceCounter(&now);
         if (!timer) return;
         bits = GUEST32(timer + 0x20u); memcpy(&seconds, &bits, 4);
-        bits = GUEST32(0x002F3A38u); memcpy(&step, &bits, 4);
+        bits = GUEST32(BLACK_VA(0x002F3A38u)); memcpy(&step, &bits, 4);
         bits = GUEST32(timer + 0x1Cu); memcpy(&dt, &bits, 4);
         if (t0.QuadPart) {
             double wall = (double)(now.QuadPart - t0.QuadPart) / (double)f.QuadPart;
@@ -629,10 +630,10 @@ void sub_0002BA70(void)
                             "interval TWO -> ONE (simulation timing unverified)\n");
     }
     if (black_60fps || black_hz60_enabled()) {
-        if (GUEST32(0x002B2A08u) == 0x80000002u)
-            GUEST32(0x002B2A08u) = 0x80000001u;
-        if (GUEST32(0x0027C204u) == 0x80000002u)
-            GUEST32(0x0027C204u) = 0x80000001u;
+        if (GUEST32(BLACK_VA(0x002B2A08u)) == 0x80000002u)
+            GUEST32(BLACK_VA(0x002B2A08u)) = 0x80000001u;
+        if (GUEST32(BLACK_VA(0x0027C204u)) == 0x80000002u)
+            GUEST32(BLACK_VA(0x0027C204u)) = 0x80000001u;
     }
     black_sim_log();
     sub_0002BA70_gen();
@@ -761,8 +762,8 @@ static void black_ao_camera_publish(uint32_t camera)
     uint32_t renderer, hx_bits, hy_bits;
     float hx, hy;
     static int trace = -1, trace_count;
-    if (!black_pc_ram_span(0x002D67F4u, 4u)) return;
-    renderer = GUEST32(0x002D67F4u);
+    if (!black_pc_ram_span(BLACK_VA(0x002D67F4u), 4u)) return;
+    renderer = GUEST32(BLACK_VA(0x002D67F4u));
     if (!black_pc_ram_span(renderer, 0xD4F0u) ||
         camera != renderer + 0xD450u) return;
     hx_bits = GUEST32(camera + 0x48u);
@@ -837,8 +838,8 @@ uint32_t black_viewmodel_draw_begin(uint32_t material_parameters)
     uint32_t renderer;
     black_vm_active = 0u;
     if (!black_vm_owner || material_parameters != black_vm_owner + 0x2C8u ||
-        black_vm_scale_bits == 0x3F800000u || !black_pc_ram_span(0x2D67F4u, 4u)) return previous;
-    renderer = GUEST32(0x2D67F4u);
+        black_vm_scale_bits == 0x3F800000u || !black_pc_ram_span(BLACK_VA(0x2D67F4u), 4u)) return previous;
+    renderer = GUEST32(BLACK_VA(0x2D67F4u));
     if (black_pc_ram_span(renderer, 0xD594u) && GUEST32(renderer + 0xD590u) == renderer + 0xD450u)
         black_vm_active = 1u;
     return previous;
@@ -896,9 +897,9 @@ void black_viewmodel_constants(uint32_t upload)
 void black_viewmodel_muzzle_constants(uint32_t upload, uint32_t caller)
 {
     uint32_t player, previous;
-    if (caller != 0x0016B49Eu || !black_vm_owner ||
-        !black_pc_ram_span(0x2D45D4u, 4u)) return;
-    player = GUEST32(0x2D45D4u);
+    if (caller != BLACK_VA(0x0016B49Eu) || !black_vm_owner ||
+        !black_pc_ram_span(BLACK_VA(0x2D45D4u), 4u)) return;
+    player = GUEST32(BLACK_VA(0x2D45D4u));
     if (!black_pc_ram_span(player, 0x4D0u) || player + 0x30u != black_vm_owner) return;
     previous = black_viewmodel_draw_begin(black_vm_owner + 0x2C8u);
     black_viewmodel_constants_kind(upload, 1);
@@ -946,10 +947,10 @@ void sub_000D2F40(void)
     fesetenv(FE_DFL_ENV);
     _mm_setcsr(0x1F80u);
     black_fov_refresh();
-    if (black_fov_vertical && black_pc_ram_span(0x002D67F4u, 4u) &&
-        black_pc_ram_span(0x002D12B8u, 4u)) {
-        const uint32_t renderer = GUEST32(0x002D67F4u);
-        const uint32_t owner = GUEST32(0x002D12B8u);
+    if (black_fov_vertical && black_pc_ram_span(BLACK_VA(0x002D67F4u), 4u) &&
+        black_pc_ram_span(BLACK_VA(0x002D12B8u), 4u)) {
+        const uint32_t renderer = GUEST32(BLACK_VA(0x002D67F4u));
+        const uint32_t owner = GUEST32(BLACK_VA(0x002D12B8u));
         if (black_pc_ram_span(renderer, 0xD4F0u) &&
             camera == renderer + 0xD450u &&
             black_pc_ram_span(owner, 0x16A5u) &&
@@ -979,8 +980,8 @@ void sub_000D2F40(void)
     }
     /* Clear the compensation when the primary view returns to its native lens.
      * Secondary/UI camera production cannot replace this world-camera ratio. */
-    if (black_pc_ram_span(0x002D67F4u, 4u)) {
-        const uint32_t renderer = GUEST32(0x002D67F4u);
+    if (black_pc_ram_span(BLACK_VA(0x002D67F4u), 4u)) {
+        const uint32_t renderer = GUEST32(BLACK_VA(0x002D67F4u));
         if (black_pc_ram_span(renderer, 0xD4F0u) && camera == renderer + 0xD450u)
             black_viewmodel_scale(adjusted ? saved_window : 0u, adjusted ? new_window : 0u);
     }
@@ -1018,7 +1019,7 @@ void black_weapon_trace(uint32_t stage, uint32_t object)
     }
     if (!enabled) goto done;
     ++records;
-    if (black_pc_ram_span(0x002D0D64u, 4u)) manager = GUEST32(0x002D0D64u);
+    if (black_pc_ram_span(BLACK_VA(0x002D0D64u), 4u)) manager = GUEST32(BLACK_VA(0x002D0D64u));
     fprintf(stderr, "[WEAPON] n=%u stage=%u object=%08X", records, stage, object);
     if ((stage == 1u || stage == 2u) && black_pc_ram_span(object, 0x3B0u)) {
         uint32_t weapon = GUEST32(object + 0x29Cu), slots = GUEST32(object + 0x258u);
@@ -1239,12 +1240,12 @@ static int black_test_weapon_loadout_valid(uint32_t record)
 {
     const uint8_t *memory = (const uint8_t *)(uintptr_t)g_xbox_mem_offset;
     uint32_t core, inventory, header, entries, count, i, matches = 0;
-    if (!black_pc_ram_span(0x2D45D4u, 4u) || !black_pc_ram_span(0x2D12D0u, 4u)) return 0;
-    core = GUEST32(0x2D45D4u);
+    if (!black_pc_ram_span(BLACK_VA(0x2D45D4u), 4u) || !black_pc_ram_span(BLACK_VA(0x2D12D0u), 4u)) return 0;
+    core = GUEST32(BLACK_VA(0x2D45D4u));
     if (!black_pc_ram_span(core, 0x5CB2u) || record != core + 0x3F0u ||
         !black_pc_ram_span(record, 0x50u) || memory[core + 0x5CB1u] ||
         (memory[core + 0x5AECu] != 5u && memory[core + 0x5AECu] != 6u)) return 0;
-    inventory = GUEST32(0x2D12D0u);
+    inventory = GUEST32(BLACK_VA(0x2D12D0u));
     if (!black_pc_ram_span(inventory, 4u)) return 0;
     header = GUEST32(inventory);
     if (!black_pc_ram_span(header, 8u)) return 0;
@@ -1303,7 +1304,7 @@ static int black_test_stream_unit_valid(uint32_t core, unsigned unit)
     const uint8_t *memory = (const uint8_t *)(uintptr_t)g_xbox_mem_offset;
     uint32_t header;
     unsigned count;
-    if (!black_pc_ram_span(0x2D45D4u, 4u) || core != GUEST32(0x2D45D4u) ||
+    if (!black_pc_ram_span(BLACK_VA(0x2D45D4u), 4u) || core != GUEST32(BLACK_VA(0x2D45D4u)) ||
         !black_pc_ram_span(core, 0x5AF8u) ||
         (memory[core + 0x5AECu] != 5u && memory[core + 0x5AECu] != 6u) ||
         memory[core + 0x5AEDu] != 1u) return 0;
@@ -1457,7 +1458,7 @@ void sub_00115B40(void)
     black_aspect_refresh();
     _mm_setcsr(caller_csr);
     const uint32_t scale_bits = black_hud_scale_bits();
-    const uint32_t renderer = scale_bits ? GUEST32(0x2D67F4u) : 0u;
+    const uint32_t renderer = scale_bits ? GUEST32(BLACK_VA(0x2D67F4u)) : 0u;
     const uint32_t stack_begin = stack >= 0x10040u ?
         ((stack - 4u) & ~15u) - 0x20u : 0u;
     const uint32_t stack_bytes = stack_begin ? stack + 4u - stack_begin : 0u;
@@ -1468,14 +1469,14 @@ void sub_00115B40(void)
         black_hud_disjoint(ui, 0x37A0u, stack_begin, stack_bytes) &&
         black_hud_disjoint(ui, 0x37A0u, renderer + 0xD428u, 8u) &&
         black_hud_disjoint(ui, 0x37A0u, renderer + 0xCu, 1u) &&
-        black_hud_disjoint(ui, 0x37A0u, 0x5629A4u, 4u) &&
-        black_hud_disjoint(ui, 0x37A0u, 0x2D67F4u, 4u) &&
+        black_hud_disjoint(ui, 0x37A0u, BLACK_VA(0x5629A4u), 4u) &&
+        black_hud_disjoint(ui, 0x37A0u, BLACK_VA(0x2D67F4u), 4u) &&
         black_hud_disjoint(stack_begin, stack_bytes, renderer + 0xD428u, 8u) &&
-        black_hud_disjoint(stack_begin, stack_bytes, 0x5629A4u, 4u) &&
+        black_hud_disjoint(stack_begin, stack_bytes, BLACK_VA(0x5629A4u), 4u) &&
         black_hud_disjoint(stack_begin, stack_bytes, renderer + 0xCu, 1u) &&
-        black_hud_disjoint(stack_begin, stack_bytes, 0x2D67F4u, 4u);
+        black_hud_disjoint(stack_begin, stack_bytes, BLACK_VA(0x2D67F4u), 4u);
     const uint32_t width = adjust ? GUEST32(renderer + 0xD428u) : 0u;
-    const uint32_t virtual_width = adjust ? GUEST32(0x5629A4u) : 0u;
+    const uint32_t virtual_width = adjust ? GUEST32(BLACK_VA(0x5629A4u)) : 0u;
     sub_00115B40_gen();
     if (adjust) {
         const unsigned int original_csr = _mm_getcsr();
@@ -1498,8 +1499,8 @@ void sub_00113E70(void)
     black_aspect_refresh();
     _mm_setcsr(caller_csr);
     const uint32_t scale_bits = black_hud_scale_bits();
-    const uint32_t renderer = scale_bits ? GUEST32(0x2D67F4u) : 0u;
-    const uint32_t ui = scale_bits ? GUEST32(0x2D199Cu) : 0u;
+    const uint32_t renderer = scale_bits ? GUEST32(BLACK_VA(0x2D67F4u)) : 0u;
+    const uint32_t ui = scale_bits ? GUEST32(BLACK_VA(0x2D199Cu)) : 0u;
     const uint32_t input = scale_bits && black_hud_span(stack, 8u) ?
         GUEST32(stack + 4u) : 0u;
     const int adjust = scale_bits && black_hud_span(ui, 0x37A0u) &&
@@ -1510,8 +1511,8 @@ void sub_00113E70(void)
         black_hud_disjoint(input, 24u, stack - 4u, 12u) &&
         black_hud_disjoint(ui + 0x3740u, 24u, stack - 4u, 12u) &&
         black_hud_disjoint(ui + 0x3740u, 24u, renderer + 0xCu, 1u) &&
-        black_hud_disjoint(ui + 0x3740u, 24u, 0x2D67F4u, 4u) &&
-        black_hud_disjoint(ui + 0x3740u, 24u, 0x2D199Cu, 4u) &&
+        black_hud_disjoint(ui + 0x3740u, 24u, BLACK_VA(0x2D67F4u), 4u) &&
+        black_hud_disjoint(ui + 0x3740u, 24u, BLACK_VA(0x2D199Cu), 4u) &&
         black_hud_disjoint(stack - 4u, 12u, renderer + 0xCu, 1u);
     const uint32_t input_x = adjust ? GUEST32(input + 0x10u) : 0u;
     sub_00113E70_gen();
@@ -1639,7 +1640,7 @@ static uint32_t black_scope_trace_tall_keys[64][8];
  * None of these looser diagnostic gates authorize a mask write. */
 static void black_scope_mask_trace_entry(uint32_t stack)
 {
-    uint32_t ui = black_scope_trace_word(0x2D199Cu, 0u), slots[105], key[8];
+    uint32_t ui = black_scope_trace_word(BLACK_VA(0x2D199Cu), 0u), slots[105], key[8];
     unsigned i, j, changed, first, tall = 0u, csr;
     fenv_t environment;
     first = black_scope_trace_entries < 4u;
@@ -1680,8 +1681,8 @@ static void black_scope_mask_trace_entry(uint32_t stack)
     fprintf(stderr, "[BLACK_SCOPE_ENTRY] entry=%u slotRecords=%u tallRecords=%u first=%u changed=%u tall=%u stack=%08X stackValid=%u ret=%08X shape=%08X mode=%08X ui=%08X uiValid=%u renderer=%08X chart=%08X,%08X affine=%08X,%08X,%08X,%08X,%08X,%08X\n",
         black_scope_trace_entries, black_scope_trace_slot_records, black_scope_trace_tall_records,
         first, changed, tall, stack, black_hud_span(stack, 12u), black_scope_trace_word(stack, 0u),
-        key[0], key[1], ui, black_hud_span(ui, 0x37A0u), black_scope_trace_word(0x2D67F4u, 0u),
-        black_scope_trace_word(0x5629A4u, 0u), black_scope_trace_word(0x5629C8u, 0u),
+        key[0], key[1], ui, black_hud_span(ui, 0x37A0u), black_scope_trace_word(BLACK_VA(0x2D67F4u), 0u),
+        black_scope_trace_word(BLACK_VA(0x5629A4u), 0u), black_scope_trace_word(BLACK_VA(0x5629C8u), 0u),
         key[2], key[3], key[4], key[5], key[6], key[7]);
     if (changed) for (i = 0u; i < 13u; ++i) {
         const uint32_t entry = slots[6u + i * 8u], name = slots[7u + i * 8u];
@@ -1716,7 +1717,7 @@ static void black_scope_mask_trace(uint32_t stack)
     black_scope_mask_trace_entry(stack);
     if (black_scope_trace_records == 48u ||
         !black_hud_span(stack, 12u)) return;
-    ui = black_scope_trace_word(0x2D199Cu, 0u);
+    ui = black_scope_trace_word(BLACK_VA(0x2D199Cu), 0u);
     if (!black_hud_span(ui, 0x37A0u)) return;
     for (slot = 0u; slot < 13u; ++slot) {
         uint32_t count, name, n;
@@ -1751,13 +1752,13 @@ static void black_scope_mask_trace(uint32_t stack)
          (m[3] & 0x7FFFFFFFu) > 0x43800000u)) return;
     key[0] = resource; key[1] = leaf; key[2] = shape; key[3] = mode;
     memcpy(key + 4u, m, sizeof(m));
-    key[10] = black_scope_trace_word(0x5629A4u, 0u);
-    key[11] = black_scope_trace_word(0x5629C8u, 0u);
+    key[10] = black_scope_trace_word(BLACK_VA(0x5629A4u), 0u);
+    key[11] = black_scope_trace_word(BLACK_VA(0x5629C8u), 0u);
     for (i = 0u; i < black_scope_trace_records; ++i)
         if (!memcmp(key, black_scope_trace_keys[i], sizeof(key))) return;
     memcpy(black_scope_trace_keys[black_scope_trace_records], key, sizeof(key));
     ++black_scope_trace_records;
-    renderer = black_scope_trace_word(0x2D67F4u, 0u);
+    renderer = black_scope_trace_word(BLACK_VA(0x2D67F4u), 0u);
     pack = black_scope_trace_word(block, 0x18u);
     geometries = black_scope_trace_word(pack, 12u);
     subshape = black_scope_trace_word(shape, 0u);
@@ -1821,13 +1822,13 @@ static int black_scope_mask_begin(uint32_t stack, uint32_t *ui_out, uint32_t sav
     __m128 shifted_left, shifted_right, edge, width, sx;
     if (!scale || stack < 0x10020u || !black_hud_span(stack - 0x20u, 0x2Cu) ||
         GUEST32(stack + 8u)) return 0; /* Ordinary leaf draw, never a stencil pass. */
-    ui = GUEST32(0x2D199Cu);
-    renderer = GUEST32(0x2D67F4u);
+    ui = GUEST32(BLACK_VA(0x2D199Cu));
+    renderer = GUEST32(BLACK_VA(0x2D67F4u));
     shape = GUEST32(stack + 4u);
     if (!black_hud_span(ui, 0x37A0u) || !black_hud_span(renderer, 0xD430u) ||
         !*(const unsigned char *)((uintptr_t)g_xbox_mem_offset + renderer + 0xCu) ||
         !black_hud_disjoint(ui + 0x3740u, 24u, stack - 0x20u, 0x2Cu) ||
-        GUEST32(0x5629A4u) != 0x44200000u || GUEST32(0x5629C8u) != 0x43F00000u ||
+        GUEST32(BLACK_VA(0x5629A4u)) != 0x44200000u || GUEST32(BLACK_VA(0x5629C8u)) != 0x43F00000u ||
         GUEST32(ui + 0x3740u) != 0x41DBFFF0u || GUEST32(ui + 0x3744u) ||
         GUEST32(ui + 0x3748u) || GUEST32(ui + 0x374Cu) != 0x427A0090u ||
         GUEST32(ui + 0x3754u) != 0xC1200000u || !black_scope_owned(ui, shape)) return 0;
@@ -1933,8 +1934,8 @@ recomp_func_t recomp_lookup_manual(uint32_t xbox_va)
             return g_itrace_wrappers[i];
     /* This XBE thunk shares the implementation of the discovered 0x0020B3B0
      * async worker thunk. Keep the missing-file recovery callback resolvable. */
-    if (xbox_va == 0x0020B6D0u)
-        return recomp_lookup(0x0020B3B0u);
+    if (xbox_va == BLACK_VA(0x0020B6D0u))
+        return recomp_lookup(BLACK_VA(0x0020B3B0u));
     return (recomp_func_t)0;
 }
 
@@ -2126,7 +2127,7 @@ static RECOMP_TLS uint32_t black_movie_frame_device;
 
 static uint32_t black_movie_frame_capable(void)
 {
-    uint32_t device=GUEST32(0x27BFF8u);
+    uint32_t device=GUEST32(BLACK_VA(0x27BFF8u));
     if (!kelvin_active() || !black_pc_ram_span(device,0x2480u) ||
         (GUEST32(device+8u)&0x4000u)) return 0;
     return device;
@@ -2140,7 +2141,7 @@ void black_movie_tag_flip(uint32_t parameter_va)
     const unsigned csr=_mm_getcsr();
     uint32_t device=black_movie_frame_device, physical;
     black_movie_frame_device=0;
-    if (device && device==GUEST32(0x27BFF8u) &&
+    if (device && device==GUEST32(BLACK_VA(0x27BFF8u)) &&
         black_pc_ram_span(parameter_va,4u)) {
         physical=xbox_PhysicalAddressOf(parameter_va);
         if (physical<0x08000000u)
@@ -2185,7 +2186,7 @@ static int black_movie_prepare(uint32_t aspect, BlackMovieRect *result)
      * origin=S+58, LTRB=S+60, pixel-UV=S+70, color=S+80, S=callee entry ESP.
      * Fixing only this call cannot affect DA540's movie widgets. */
     if (stack < 0x10100u || !black_movie_span(stack-0x100u,0x190u) ||
-        GUEST32(stack) != 0x00121AB4u || GUEST32(stack+8u) != 1u ||
+        GUEST32(stack) != BLACK_VA(0x00121AB4u) || GUEST32(stack+8u) != 1u ||
         rect != stack+0x60u || GUEST32(stack+4u) != stack+0x58u ||
         GUEST32(stack+12u) != stack+0x70u || g_ecx != stack+0x80u)
         return 0;
@@ -2195,11 +2196,11 @@ static int black_movie_prepare(uint32_t aspect, BlackMovieRect *result)
         GUEST32(stack+0x70u) != 0u || GUEST32(stack+0x74u) != 0u ||
         GUEST32(stack+0x78u) != 0x44200000u ||
         GUEST32(stack+0x7Cu) != 0x43F00000u ||
-        GUEST32(0x2F3710u) != 0u || GUEST32(0x2F36D4u) == 2u)
+        GUEST32(BLACK_VA(0x2F3710u)) != 0u || GUEST32(BLACK_VA(0x2F36D4u)) == 2u)
         return 0;
 
-    main_object=GUEST32(0x2D45F0u); ui=GUEST32(0x2D199Cu);
-    renderer=GUEST32(0x2D67F4u);
+    main_object=GUEST32(BLACK_VA(0x2D45F0u)); ui=GUEST32(BLACK_VA(0x2D199Cu));
+    renderer=GUEST32(BLACK_VA(0x2D67F4u));
     if (!black_movie_span(main_object,0x20408u) ||
         !black_movie_span(ui,0x391Cu) ||
         !black_movie_span(renderer,0xD430u)) return 0;
@@ -2217,7 +2218,7 @@ static int black_movie_prepare(uint32_t aspect, BlackMovieRect *result)
      * actually allocated at D36CB, so this policy supports exactly 0/1. */
     if (frame > 1u) return 0;
     buffer=movie+frame*0x20u;
-    if (g_edi != buffer || GUEST32(0x56EF30u) != buffer ||
+    if (g_edi != buffer || GUEST32(BLACK_VA(0x56EF30u)) != buffer ||
         GUEST32(buffer+0x18u) != 640u ||
         GUEST32(buffer+0x1Cu) != 480u) return 0;
     texture=GUEST32(buffer+0x14u);
@@ -2229,16 +2230,16 @@ static int black_movie_prepare(uint32_t aspect, BlackMovieRect *result)
     reads[2].address=renderer; reads[2].bytes=0xD430u;
     reads[3].address=movie; reads[3].bytes=0x68u;
     reads[4].address=texture; reads[4].bytes=0x18u;
-    reads[5].address=0x2D199Cu; reads[5].bytes=4u;
-    reads[6].address=0x2D45F0u; reads[6].bytes=4u;
-    reads[7].address=0x2D67F4u; reads[7].bytes=4u;
-    reads[8].address=0x2F3640u; reads[8].bytes=0xE4u;
-    reads[9].address=0x56E600u; reads[9].bytes=0x2000u;
-    reads[10].address=0x563120u; reads[10].bytes=0x1800u;
-    reads[11].address=0x27CE88u; reads[11].bytes=32u;
-    reads[12].address=0x279B58u; reads[12].bytes=1u;
-    reads[13].address=0x28B470u; reads[13].bytes=24u;
-    reads[14].address=0x295CB4u; reads[14].bytes=4u;
+    reads[5].address=BLACK_VA(0x2D199Cu); reads[5].bytes=4u;
+    reads[6].address=BLACK_VA(0x2D45F0u); reads[6].bytes=4u;
+    reads[7].address=BLACK_VA(0x2D67F4u); reads[7].bytes=4u;
+    reads[8].address=BLACK_VA(0x2F3640u); reads[8].bytes=0xE4u;
+    reads[9].address=BLACK_VA(0x56E600u); reads[9].bytes=0x2000u;
+    reads[10].address=BLACK_VA(0x563120u); reads[10].bytes=0x1800u;
+    reads[11].address=BLACK_VA(0x27CE88u); reads[11].bytes=32u;
+    reads[12].address=BLACK_VA(0x279B58u); reads[12].bytes=1u;
+    reads[13].address=BLACK_VA(0x28B470u); reads[13].bytes=24u;
+    reads[14].address=BLACK_VA(0x295CB4u); reads[14].bytes=4u;
     for (i=0;i<15u;i++)
         if (!black_movie_disjoint(stack-0x100u,0x190u,
                                   reads[i].address,reads[i].bytes)) return 0;
@@ -2299,11 +2300,11 @@ static uint32_t black_direct_scale_bits(void)
     unsigned native;
     if(black_aspect_bits!=0x3FE38E39u && black_aspect_bits!=0x40155555u &&
        black_aspect_bits!=0x40638E39u)return 0;
-    if(!black_pc_ram_span(0x2F4348u,1u))return 0;
-    native=*(const unsigned char *)((uintptr_t)g_xbox_mem_offset+0x2F4348u);
+    if(!black_pc_ram_span(BLACK_VA(0x2F4348u),1u))return 0;
+    native=*(const unsigned char *)((uintptr_t)g_xbox_mem_offset+BLACK_VA(0x2F4348u));
     if(native){
-        if(!black_pc_ram_span(0x2AF460u,8u) || GUEST32(0x2AF460u)!=0x3F800000u ||
-           GUEST32(0x2AF464u)!=0x3FAAAAABu)return 0;
+        if(!black_pc_ram_span(BLACK_VA(0x2AF460u),8u) || GUEST32(BLACK_VA(0x2AF460u))!=0x3F800000u ||
+           GUEST32(BLACK_VA(0x2AF464u))!=0x3FAAAAABu)return 0;
         return black_aspect_bits==0x40155555u ? 0x3F430C31u :
                black_aspect_bits==0x40638E39u ? 0x3F000000u : 0u;
     }
@@ -2391,7 +2392,7 @@ static int black_direct_records(uint32_t slots,uint32_t n,uint32_t root,uint32_t
                 object=GUEST32(node+0x2Cu);
                 if(!black_direct_input(root,object,0x10u) ||
                    !black_direct_font(root,GUEST32(object+8u),GUEST32(node+0x28u)))return 0;
-             }else if(callback==0xD8B80u || callback==0x135370u || callback==0x1355B0u){
+             }else if(callback==0xD8B80u || callback==BLACK_VA(0x135370u) || callback==BLACK_VA(0x1355B0u)){
                 if(!black_direct_font(root,GUEST32(node+0x28u),GUEST32(node+0x2Cu)))return 0;
              }}
             node=GUEST32(node);
@@ -2404,9 +2405,9 @@ static uint32_t black_direct_root(uint32_t context,uint32_t stack)
 {
     uint32_t hud,renderer,root,slots,n,start,count,other,stack_begin,device,write,end,i,banks;
     unsigned left=512u;
-    if(!black_pc_ram_span(stack,8u) || GUEST32(stack)!=0x13C02Fu)return 0;
-    if(!black_pc_ram_span(0x2D12E4u,4u) || !black_pc_ram_span(0x2D67F4u,4u))return 0;
-    hud=GUEST32(0x2D12E4u);renderer=GUEST32(0x2D67F4u);
+    if(!black_pc_ram_span(stack,8u) || GUEST32(stack)!=BLACK_VA(0x13C02Fu))return 0;
+    if(!black_pc_ram_span(BLACK_VA(0x2D12E4u),4u) || !black_pc_ram_span(BLACK_VA(0x2D67F4u),4u))return 0;
+    hud=GUEST32(BLACK_VA(0x2D12E4u));renderer=GUEST32(BLACK_VA(0x2D67F4u));
     if(!black_pc_ram_span(hud,0x240u) || !black_pc_ram_span(renderer,0xD568u) ||
        !*(const unsigned char *)((uintptr_t)g_xbox_mem_offset+renderer+0xCu) ||
        (context!=hud+0x40u && context!=hud+0xE8u))return 0;
@@ -2425,25 +2426,25 @@ static uint32_t black_direct_root(uint32_t context,uint32_t stack)
        !black_direct_disjoint(hud,0x240u,stack_begin,0x10008u) ||
        !black_direct_disjoint(renderer,0xD568u,stack_begin,0x10008u) ||
        !black_direct_disjoint(slots,n*16u,stack_begin,0x10008u) ||
-       !black_direct_disjoint(0x2D12E4u,4u,stack_begin,0x10008u) ||
-       !black_direct_disjoint(0x2D67F4u,4u,stack_begin,0x10008u) ||
+       !black_direct_disjoint(BLACK_VA(0x2D12E4u),4u,stack_begin,0x10008u) ||
+       !black_direct_disjoint(BLACK_VA(0x2D67F4u),4u,stack_begin,0x10008u) ||
        !black_direct_disjoint(root,0x50u,hud,0x240u) ||
        !black_direct_disjoint(root,0x50u,renderer,0xD568u) ||
        !black_direct_disjoint(root,0x50u,slots,n*16u) ||
        (other && !black_direct_disjoint(root,0x50u,other,0x50u)) ||
-       !black_direct_disjoint(root,0x50u,0x2D12E4u,4u) ||
-       !black_direct_disjoint(root,0x50u,0x2D67F4u,4u) ||
-       !black_direct_disjoint(root,0x50u,0x2F4348u,1u) ||
-       !black_direct_disjoint(root,0x50u,0x2AF460u,8u) ||
-       !black_direct_disjoint(root,0x50u,0x295C00u,0x1000u) ||
-       !black_direct_disjoint(root,0x50u,0x2EDB00u,0x3000u) ||
-       !black_direct_disjoint(root,0x50u,0x2F3600u,0xE00u) ||
-       !black_direct_disjoint(root,0x50u,0x2F4518u,0x20u) ||
-       !black_direct_disjoint(root,0x50u,0x563120u,0x1810u) ||
-       !black_direct_disjoint(root,0x50u,0x56EF30u,4u))return 0;
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2D12E4u),4u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2D67F4u),4u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2F4348u),1u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2AF460u),8u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x295C00u),0x1000u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2EDB00u),0x3000u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2F3600u),0xE00u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2F4518u),0x20u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x563120u),0x1810u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x56EF30u),4u))return 0;
     /* Device setup/binding can update current resource reference words and
      * its command buffer. Keep the borrowed root outside those inputs too. */
-    device=GUEST32(0x27BFF8u);
+    device=GUEST32(BLACK_VA(0x27BFF8u));
     if(!black_direct_input(root,device,0x1A10u))return 0;
     write=GUEST32(device);end=GUEST32(device+4u);
     if(end<write || !black_direct_input(root,write,end-write))return 0;
@@ -2555,10 +2556,10 @@ void sub_000C5A80(void)
     const uint32_t self = g_ecx;
     uint64_t token = 0;
     int sampled = 0;
-    if (black_pc_ram_span(0x002D45E8u, 4u)) {
-        const uint32_t manager = GUEST32(0x002D45E8u);
+    if (black_pc_ram_span(BLACK_VA(0x002D45E8u), 4u)) {
+        const uint32_t manager = GUEST32(BLACK_VA(0x002D45E8u));
         if (black_pc_ram_span(manager, 0x1B8u) &&
-            self == manager + 0x98u && GUEST32(self) == 0x0028CE00u) {
+            self == manager + 0x98u && GUEST32(self) == BLACK_VA(0x0028CE00u)) {
             const uint32_t records = GUEST32(self + 0x118u);
             const uint32_t port = GUEST32(self + 0x11Cu);
             const uint64_t record = (uint64_t)records + (uint64_t)port * 32u;
@@ -2602,14 +2603,14 @@ void sub_000C5A80(void)
  */
 int black_pc_input_gameplay_blocked_query(void)
 {
-    if (black_pc_ram_span(0x002D45F0u, 4u)) {
-        const uint32_t main = GUEST32(0x002D45F0u);
+    if (black_pc_ram_span(BLACK_VA(0x002D45F0u), 4u)) {
+        const uint32_t main = GUEST32(BLACK_VA(0x002D45F0u));
         if (black_pc_ram_span(main, 0x210C9u) &&
             *(const uint8_t *)((uintptr_t)g_xbox_mem_offset + main + 0x210C8u))
             return 1;
     }
-    if (black_pc_ram_span(0x002D45D4u, 4u)) {
-        const uint32_t clock = GUEST32(0x002D45D4u);
+    if (black_pc_ram_span(BLACK_VA(0x002D45D4u), 4u)) {
+        const uint32_t clock = GUEST32(BLACK_VA(0x002D45D4u));
         if (black_pc_ram_span(clock, 0x29u) &&
             !*(const uint8_t *)((uintptr_t)g_xbox_mem_offset + clock + 0x28u))
             return 1;
@@ -2644,12 +2645,12 @@ static void black_input_put_f32(uint32_t va, float value)
  * loaded XBE. No retail control table is embedded in the host source. */
 int black_pc_input_resolver(int slot)
 {
-    const uint32_t map_pointer = 0x002F3BD4u;
+    const uint32_t map_pointer = BLACK_VA(0x002F3BD4u);
     uint32_t map, control;
 
     if (slot < 0 || slot > 36) return -1;
     map = black_pc_ram_span(map_pointer, 4u) ? GUEST32(map_pointer) : 0;
-    if (!map || !black_pc_ram_span(map, 37u * 4u)) map = 0x002A7AF0u;
+    if (!map || !black_pc_ram_span(map, 37u * 4u)) map = BLACK_VA(0x002A7AF0u);
     if (!black_pc_ram_span(map, 37u * 4u)) return -1;
     control = GUEST32(map + (uint32_t)slot * 4u);
     return control < 28u ? (int)control : -1;
@@ -2670,7 +2671,7 @@ static void black_mouse_look(uint32_t camera)
     zoom_object = GUEST32(camera + 0x8Cu);
     if (black_pc_ram_span(zoom_object, 0x2A8u)) {
         /* the original's own expression: 1 / (((zoom - 1) * k) + 1) */
-        const double one = black_input_f32(0x00295C74u), k = black_input_f32(0x00295DB8u);
+        const double one = black_input_f32(BLACK_VA(0x00295C74u)), k = black_input_f32(BLACK_VA(0x00295DB8u));
         const double zoom = black_input_f32(zoom_object + 0x2A4u);
         const double denominator = (zoom - one) * k + one;
         if (isfinite(denominator) && denominator > 0.0 && isfinite(one) && one > 0.0)
@@ -2680,8 +2681,8 @@ static void black_mouse_look(uint32_t camera)
      * back: it adds no traps and no sticky flags to the guest's floating-point state. */
     yaw = (double)black_input_f32(camera + 0x18u) + yaw_delta * zoom_scale;
     pitch = (double)black_input_f32(camera + 0x1Cu) + pitch_delta * zoom_scale;
-    upper = black_input_f32(0x002888C8u);       /* +70 */
-    lower = black_input_f32(0x00295E38u);       /* -70 */
+    upper = black_input_f32(BLACK_VA(0x002888C8u));       /* +70 */
+    lower = black_input_f32(BLACK_VA(0x00295E38u));       /* -70 */
     if (isfinite(yaw) && isfinite(pitch) && isfinite(upper) && isfinite(lower) && lower < upper) {
         float yaw_value, pitch_value;
         yaw = fmod(yaw + 180.0, 360.0);          /* any size of turn, into [-180, 180) */
@@ -2753,10 +2754,10 @@ void sub_00113BF0(void)
         uint32_t capacity = 0;
         int confirm_only = 0;
         switch (caller) {
-        case 0x00118630u: capacity = 256u; break;
-        case 0x00129EB7u: capacity = 120u; break;
-        case 0x0012B4EFu: capacity = 200u; break;
-        case 0x0012B4E0u: capacity = 64u; confirm_only = 1; break;   /* "\r\n\r\n<A> to continue" */
+        case BLACK_VA(0x00118630u): capacity = 256u; break;
+        case BLACK_VA(0x00129EB7u): capacity = 120u; break;
+        case BLACK_VA(0x0012B4EFu): capacity = 200u; break;
+        case BLACK_VA(0x0012B4E0u): capacity = 64u; confirm_only = 1; break;   /* "\r\n\r\n<A> to continue" */
         default: break;
         }
         if (capacity && black_pc_ram_span(buffer, capacity * 2u))
