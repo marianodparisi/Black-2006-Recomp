@@ -94,7 +94,6 @@ static int f_gamecode(void *ctx, const char *name, const char *const args[3], in
     if (!strcmp(name, "ToggleVibration")) value_set("FEVibration", atoi(args[0]));
     if (!strcmp(name, "SetSfxValue")) value_set("FESFXVolume", atoi(args[0]));
     if (!strcmp(name, "SetMusicValue")) value_set("FEMusicVolume", atoi(args[0]));
-    if (!strcmp(name, "ChangeDifficulty")) value_set("FEDifficulty", atoi(args[0]));
     return 1;
 }
 
@@ -750,69 +749,64 @@ static void test_pointer(void)
     CHECK(log_is("gamecode ToggleCrouchOnOff 0 0 0\n"), "a click on the right of a toggle row is OFF: '%s'", g_log);
 }
 
-/* The native Difficulty page (the original choosedifficulty ActionScript): choosing the current difficulty leaves;
- * choosing the other changes it and asks, YES keeps it and leaves, NO puts the earlier one back. Hard needs
- * FEDifficultyHard. */
+/* The Difficulty page: four levels, those above FE_MissionDifficulty locked, the first focus from
+ * FE_DifficultySelection (or the highest open level below it), a description per level as the focus moves. */
 static void test_difficulty(void)
 {
     static const char def[] =
         "[page Difficulty]\n"
-        "title = $FE_DIFFICULTY\n"
-        "list = 319.5 165 25\n"
-        "focus = 1\n"
-        "back = page blacktitlemenu2\n"
-        "item = $FE_NORMAL | gamecode StartNewMission | if FEDifficulty=1\n"
-        "item = $FE_NORMAL | gamecode ChangeDifficulty 1; set FEDifficultyBefore 2; open DifficultyWarning | unless FEDifficulty=1\n"
-        "item = $FE_HARD | gamecode StartNewMission | if FEDifficulty=2\n"
-        "item = $FE_HARD | gamecode ChangeDifficulty 2; set FEDifficultyBefore 1; open DifficultyWarning | unless FEDifficulty=2 | disabled unless FEDifficultyHard\n"
-        "[page DifficultyWarning]\n"
-        "text = 301 188 $FE_DIFFICULTYWARNING | wrap 300\n"
-        "list = 300.5 295 25\n"
-        "focus = 2\n"
-        "back = gamecode ChangeDifficulty @FEDifficultyBefore; close\n"
-        "item = $FE_YES | close; gamecode StartNewMission\n"
-        "item = $FE_NO | gamecode ChangeDifficulty @FEDifficultyBefore; close\n"
+        "title = $FE_DIFFICULTYSELECT\n"
+        "list = 253 133 28\n"
+        "text = 203 252 &FE_DIFFICULTYDESC | wrap 380\n"
+        "focus_from = FE_DifficultySelection\n"
+        "back = gamecode DifficultyBack\n"
+        "item = $FE_EASY | gamecode SelectedDifficulty 0 | focus gamecode UpdateDificulty 0\n"
+        "item = $FE_NORMAL | gamecode SelectedDifficulty 1 | focus gamecode UpdateDificulty 1 | disabled unless FE_MissionDifficulty>1\n"
+        "item = $FE_HARD | gamecode SelectedDifficulty 2 | focus gamecode UpdateDificulty 2 | disabled unless FE_MissionDifficulty>2\n"
+        "item = $FE_BLACKOPS | gamecode SelectedDifficulty 3 | focus gamecode UpdateDificulty 3 | disabled unless FE_MissionDifficulty>3\n"
         ;
     reset_game();
-    value_set("FEDifficulty", 1); value_set("FEDifficultyHard", 0);
+    value_set("FE_MissionDifficulty", 1); value_set("FE_DifficultySelection", 0);
     pc_menu_test_reset(def);
     tick("");
     CHECK(tick("Difficulty") == 1, "Difficulty is native");
-    CHECK(pc_menu_test_focus() == 0, "focus starts on Normal (%d)", pc_menu_test_focus());
-    log_clear();
+    CHECK(pc_menu_test_focus() == 0, "only Easy open: the focus is on Easy (%d)", pc_menu_test_focus());
     press(PCM_ACT_DOWN, "Difficulty");
-    CHECK(pc_menu_test_focus() == 0, "locked Hard is not offered (%d)", pc_menu_test_focus());
+    CHECK(pc_menu_test_focus() == 0, "the locked levels are not offered (%d)", pc_menu_test_focus());
     log_clear();
     press(PCM_ACT_CONFIRM, "Difficulty");
-    CHECK(strstr(g_log, "gamecode StartNewMission 0 0 0") && !strstr(g_log, "ChangeDifficulty"),
-          "choosing the current difficulty leaves: '%s'", g_log);
+    CHECK(strstr(g_log, "gamecode SelectedDifficulty 0 0 0") != NULL, "choosing Easy starts it: '%s'", g_log);
 
     reset_game();
-    value_set("FEDifficulty", 1); value_set("FEDifficultyHard", 1);
+    value_set("FE_MissionDifficulty", 3); value_set("FE_DifficultySelection", 1);
     pc_menu_test_reset(def);
     tick(""); tick("Difficulty");
+    CHECK(pc_menu_test_focus() == 1, "the focus starts on the game's selection, Normal (%d)", pc_menu_test_focus());
+    log_clear();
     press(PCM_ACT_DOWN, "Difficulty");
-    CHECK(pc_menu_test_focus() == 3, "unlocked Hard follows Normal (%d)", pc_menu_test_focus());
-    log_clear();
-    press(PCM_ACT_CONFIRM, "Difficulty");
-    CHECK(strstr(g_log, "gamecode ChangeDifficulty 2 0 0") != NULL, "choosing Hard changes it: '%s'", g_log);
-    tick("Difficulty");
-    CHECK(pc_menu_test_focus() == 1, "the warning starts on NO (%d)", pc_menu_test_focus());
-    log_clear();
-    press(PCM_ACT_CONFIRM, "Difficulty");
-    CHECK(strstr(g_log, "gamecode ChangeDifficulty 1 0 0") && !strstr(g_log, "StartNewMission"),
-          "NO puts Normal back without leaving: '%s'", g_log);
-    tick("Difficulty");
-    CHECK(pc_menu_test_focus() == 3, "back on the page, the focus is where it was, on Hard (%d)", pc_menu_test_focus());
-
-    press(PCM_ACT_CONFIRM, "Difficulty");
-    tick("Difficulty");
+    CHECK(pc_menu_test_focus() == 2, "Hard follows Normal when open (%d)", pc_menu_test_focus());
+    CHECK(strstr(g_log, "gamecode UpdateDificulty 2 0 0") != NULL, "moving onto Hard shows its description: '%s'", g_log);
+    press(PCM_ACT_DOWN, "Difficulty");
+    CHECK(pc_menu_test_focus() == 0, "locked Black is skipped, back round to Easy (%d)", pc_menu_test_focus());
     press(PCM_ACT_UP, "Difficulty");
-    CHECK(pc_menu_test_focus() == 0, "up reaches YES (%d)", pc_menu_test_focus());
     log_clear();
     press(PCM_ACT_CONFIRM, "Difficulty");
-    CHECK(strstr(g_log, "gamecode StartNewMission 0 0 0") && !strstr(g_log, "ChangeDifficulty"),
-          "YES keeps Hard and leaves: '%s'", g_log);
+    CHECK(strstr(g_log, "gamecode SelectedDifficulty 2 0 0") != NULL, "choosing Hard starts it: '%s'", g_log);
+
+    reset_game();
+    value_set("FE_MissionDifficulty", 2); value_set("FE_DifficultySelection", 3);
+    pc_menu_test_reset(def);
+    tick(""); tick("Difficulty");
+    CHECK(pc_menu_test_focus() == 1, "a selection above the open levels starts on the highest open one (%d)", pc_menu_test_focus());
+    log_clear();
+    press(PCM_ACT_BACK, "Difficulty");
+    CHECK(strstr(g_log, "gamecode DifficultyBack") != NULL, "back is the game's DifficultyBack: '%s'", g_log);
+
+    reset_game();
+    value_set("FE_MissionDifficulty", 4); value_set("FE_DifficultySelection", 3);
+    pc_menu_test_reset(def);
+    tick(""); tick("Difficulty");
+    CHECK(pc_menu_test_focus() == 3, "all open: the focus can start on Black (%d)", pc_menu_test_focus());
 }
 
 static void test_mission_failed(void)

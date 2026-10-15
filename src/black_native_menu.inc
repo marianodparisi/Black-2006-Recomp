@@ -311,45 +311,32 @@ static const char black_menu_definition[] =
 "item = $FE_YES | exit\r\n"
 "item = $FE_NO | close\r\n"
 "\r\n"
-"; Choosing the difficulty for a new game (the original choosedifficulty page, opened by START MISSION). The game\r\n"
-"; numbers it FEDifficulty: 1 normal, 2 hard; hard is offered once FEDifficultyHard says it is unlocked. The original\r\n"
-"; changes it as the choice moves (ChangeDifficulty) and asks when it differs from the one the page opened with; the\r\n"
-"; game starts the mission with SelectDifficulty (LeaveDifficultyMenu is the Options variant, back to Options).\r\n"
+"; Choosing the difficulty (the game's difficulty page, opened by START MISSION and before a mission is replayed).\r\n"
+"; Levels 0 easy, 1 normal, 2 hard, 3 black. FE_MissionDifficulty counts the levels open to the player (easy always);\r\n"
+"; the page starts on FE_DifficultySelection, or the highest open level below it. Moving onto a level shows its\r\n"
+"; description (UpdateDificulty, the game's own spelling); choosing it starts the mission (SelectedDifficulty).\r\n"
 "[page Difficulty]\r\n"
 "column = 00000000\r\n"
-"logo = 299.5 54\r\n"
-"rails = 105 268\r\n"
-"title = $FE_DIFFICULTY\r\n"
-"title_at = 320 110\r\n"
-"list = 319.5 165 25\r\n"
-"prompts = select confirm\r\n"
-"prompts_at = 317 398 28\r\n"
-"focus = 1\r\n"
-"back = page blacktitlemenu2\r\n"
-"item = $FE_NORMAL | gamecode StartNewMission | if FEDifficulty=1\r\n"
-"item = $FE_NORMAL | gamecode ChangeDifficulty 1; set FEDifficultyBefore 2; open DifficultyWarning | unless FEDifficulty=1\r\n"
-"item = $FE_HARD | gamecode StartNewMission | if FEDifficulty=2\r\n"
-"item = $FE_HARD | gamecode ChangeDifficulty 2; set FEDifficultyBefore 1; open DifficultyWarning | unless FEDifficulty=2 | disabled unless FEDifficultyHard\r\n"
-"\r\n"
-"; The question after a change, in the look of the front end's own questions (focus starts on NO, as the original).\r\n"
-"[page DifficultyWarning]\r\n"
-"column = 00000000\r\n"
-"logo = 282.5 54\r\n"
-"rails = 94 247\r\n"
-"text = 301 188 $FE_DIFFICULTYWARNING | wrap 300\r\n"
-"list = 300.5 295 25\r\n"
-"focus = 2\r\n"
-"prompts = select confirm\r\n"
-"prompts_at = 298 398 28\r\n"
-"back = gamecode ChangeDifficulty @FEDifficultyBefore; close\r\n"
-"item = $FE_YES | close; gamecode StartNewMission\r\n"
-"item = $FE_NO | gamecode ChangeDifficulty @FEDifficultyBefore; close\r\n";
+"logo = 188 39\r\n"
+"rails = 60 163\r\n"
+"title = $FE_DIFFICULTYSELECT\r\n"
+"title_at = 203 67\r\n"
+"list = 253 128 28\r\n"
+"text = 203 252 &FE_DIFFICULTYDESC | wrap 380 | size 12\r\n"
+"prompts = select confirm back\r\n"
+"prompts_at = 224 372 28\r\n"
+"focus_from = FE_DifficultySelection\r\n"
+"back = gamecode DifficultyBack\r\n"
+"item = $FE_EASY | gamecode SelectedDifficulty 0 | focus gamecode UpdateDificulty 0\r\n"
+"item = $FE_NORMAL | gamecode SelectedDifficulty 1 | focus gamecode UpdateDificulty 1 | disabled unless FE_MissionDifficulty>1\r\n"
+"item = $FE_HARD | gamecode SelectedDifficulty 2 | focus gamecode UpdateDificulty 2 | disabled unless FE_MissionDifficulty>2\r\n"
+"item = $FE_BLACKOPS | gamecode SelectedDifficulty 3 | focus gamecode UpdateDificulty 3 | disabled unless FE_MissionDifficulty>3\r\n";
 
 /* The built-in definitions of earlier builds (FNV-1a 64 of the whole file): a local\menus.ini that is still exactly
  * one of them was never edited and is brought up to date. 1: the in-game pages only (2026-10-05); 4: before
- * the Difficulty page (2026-10-15). */
+ * the Difficulty page (2026-10-15); 5: its two-level first version (2026-10-15). */
 static const uint64_t black_menu_replaced[] = { 0xD8419D900AB2FEA6ull, 0xBBE0D874943DB641ull, 0x9F7652C358180DC6ull,
-    0xFF74A7E07CF4C7F0ull };
+    0xFF74A7E07CF4C7F0ull, 0xC9F0402F44A39FEBull };
 
 /* ---- guest helpers --------------------------------------------------------------------------------------- */
 
@@ -474,6 +461,23 @@ static int bnm_utf8_to_utf16(uint32_t at, uint16_t *out, unsigned cap)
     return (int)n;
 }
 
+/* The same for a string of this program (the localized keyboard prompts). */
+static int bnm_host_utf8_to_utf16(const char *text, uint16_t *out, unsigned cap)
+{
+    const uint8_t *u = (const uint8_t *)text;
+    unsigned n = 0;
+    while (n + 1 < cap && *u) {
+        unsigned c = u[0];
+        if (c >= 0xC0 && c < 0xE0 && (u[1] & 0xC0) == 0x80) { c = ((c & 0x1Fu) << 6) | (u[1] & 0x3Fu); u += 2; }
+        else if (c >= 0xE0 && c < 0xF0 && (u[1] & 0xC0) == 0x80 && (u[2] & 0xC0) == 0x80) {
+            c = ((c & 0x0Fu) << 12) | ((u[1] & 0x3Fu) << 6) | (u[2] & 0x3Fu); u += 3;
+        } else u += 1;
+        out[n++] = (uint16_t)c;
+    }
+    out[n] = 0;
+    return (int)n;
+}
+
 /* ---- the game's services ---------------------------------------------------------------------------------- */
 
 typedef struct BlackNmCtx { uint32_t ui; } BlackNmCtx;
@@ -526,12 +530,12 @@ static int bnm_text(void *ctx, const char *spec, uint16_t *out, unsigned cap)
         if (pc_input_prompt_device() == PC_DEVICE_KEYBOARD_MOUSE)
             for (i = 0; i < sizeof(black_menu_prompts) / sizeof(black_menu_prompts[0]); i++) {
                 char label[16], text[96];
+                const char *language = getenv("RECOMP_LANGUAGE");
                 if (black_menu_prompts[i].hash != hash) continue;
                 if (!pc_input_menu_text((PcMenuKey)black_menu_prompts[i].key, label, sizeof(label))) break;
-                snprintf(text, sizeof(text), "%s%s%s", black_menu_prompts[i].before, label, black_menu_prompts[i].after);
-                for (s = 0; text[s] && s + 1 < cap; s++) out[s] = (uint8_t)text[s];
-                out[s] = 0;
-                return (int)s;
+                snprintf(text, sizeof(text), "%s%s%s", black_menu_prompt_localize(black_menu_prompts[i].before, language),
+                         label, black_menu_prompt_localize(black_menu_prompts[i].after, language));
+                return bnm_host_utf8_to_utf16(text, out, cap);
             }
         s = bnm_string(hash);
         return s ? bnm_utf8_to_utf16(black_pc_brand_guest(s), out, cap) : -1;

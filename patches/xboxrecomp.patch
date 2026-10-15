@@ -37084,7 +37084,7 @@ diff --git a/src/video/pc_menu.c b/src/video/pc_menu.c
 new file mode 100644
 --- /dev/null
 +++ b/src/video/pc_menu.c
-@@ -0,0 +1,2582 @@
+@@ -0,0 +1,2593 @@
 +/* Native, editable menus. See pc_menu.h.
 + *
 + * The page logic follows the menu classes the game's own pages are written with (BkMenuList,
@@ -37158,6 +37158,7 @@ new file mode 100644
 +    float list_x, list_y, step, col1, col2, item_size;
 +    float logo_x, logo_y, title_x, title_y, prompt_x, prompt_y, prompt_step, bar_w, rail_l, rail_r;
 +    int focus, no_logo, plain_focus;
++    char focus_from[PCM_NAME];     /* the first focus is item (this game number + 1), or the nearest one above it */
 +    float values_x;                /* item values right-aligned at this x (0: at the first column, left-aligned) */
 +    float sep[4][3];               /* separator lines: x1, y, x2 */
 +    int nsep;
@@ -37526,6 +37527,11 @@ new file mode 100644
 +    }
 +    if (!_stricmp(key, "item_size")) {
 +        if (!parse_float(val, &p->item_size)) { perr(ps, "bad item_size", NULL); return 0; }
++        return 1;
++    }
++    if (!_stricmp(key, "focus_from")) {
++        if (!*val || strlen(val) >= PCM_NAME) { perr(ps, "focus_from needs the name of a game number", NULL); return 0; }
++        copy(p->focus_from, PCM_NAME, val);
 +        return 1;
 +    }
 +    if (!_stricmp(key, "focus")) {
@@ -38028,8 +38034,8 @@ new file mode 100644
 +    return s;
 +}
 +
-+/* "NAME" is true when the game's number is non-zero, "NAME=N" when it is N; "!" in front turns it round.
-+ * "@NAME" is a menu variable (set by an earlier page). */
++/* "NAME" is true when the game's number is non-zero, "NAME=N" when it is N, "NAME>N" / "NAME<N" when it is above /
++ * below N; "!" in front turns it round. "@NAME" is a menu variable (set by an earlier page; = only). */
 +static int cond_true(const PcMenuHost *host, const char *cond)
 +{
 +    int v = 0, neg = cond[0] == '!', is;
@@ -38037,14 +38043,14 @@ new file mode 100644
 +    const char *eq;
 +    if (!cond[0]) return 1;
 +    copy(name, PCM_NAME, cond + neg);
-+    eq = strchr(cond + neg, '=');
++    eq = strpbrk(cond + neg, "=<>");
 +    if (eq) name[eq - (cond + neg)] = 0;
 +    if (name[0] == '@') {
 +        const char *s = var_lookup(host, name + 1);
 +        is = eq ? (s && !strcmp(s, eq + 1)) : (s && s[0] && strcmp(s, "0"));
 +    } else {
 +        if (!host->value || !host->value(host->ctx, name, &v)) v = 0;
-+        is = eq ? v == atoi(eq + 1) : v != 0;
++        is = !eq ? v != 0 : *eq == '>' ? v > atoi(eq + 1) : *eq == '<' ? v < atoi(eq + 1) : v == atoi(eq + 1);
 +    }
 +    return neg ? !is : is;
 +}
@@ -38610,6 +38616,11 @@ new file mode 100644
 +    int f;
 +    if (m_focus >= 0 || !p->nitem) return;
 +    f = p->focus;
++    if (p->focus_from[0] && host->value && host->value(host->ctx, p->focus_from, &f)) {
++        if (f < 0) f = 0;
++        if (f >= p->nitem) f = p->nitem - 1;
++        while (f > 0 && !item_focusable(host, &p->item[f])) f--;
++    }
 +    if (!item_focusable(host, &p->item[f])) f = step_focus(host, p, f, 1);
 +    m_focus = m_prev_focus = f;
 +    m_focus_t0 = t - 10;
