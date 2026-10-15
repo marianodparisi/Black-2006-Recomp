@@ -257,7 +257,7 @@ index f7b9f8f..79b537b 100644
  uint64_t mcpx_apu_mmio_read(MCPXAPUState *d, uint64_t addr, unsigned int size);
 
 diff --git a/src/apu/apu_core.c b/src/apu/apu_core.c
-index 459be77..4ba263a 100644
+index 459be77..d1b37d4 100644
 --- a/src/apu/apu_core.c
 +++ b/src/apu/apu_core.c
 @@ -21,6 +21,7 @@
@@ -386,7 +386,7 @@ index 459be77..4ba263a 100644
  }
 
  /* ============================================================
-@@ -203,10 +266,225 @@ typedef struct {
+@@ -203,10 +266,231 @@ typedef struct {
 
  static WaveOutState g_waveout = { 0 };
 
@@ -496,6 +496,12 @@ index 459be77..4ba263a 100644
 +                                  int prime_packet)
 +{
 +    int xa2_active = xa2_is_active();
++    {
++        /* RECOMP_APU_MUTE=1 (unattended test runs): output silence; everything upstream runs as usual. */
++        static int mute = -1;
++        if (mute < 0) { const char *e = getenv("RECOMP_APU_MUTE"); mute = e && *e && *e != '0'; }
++        if (mute) memset(g_monitor_packet.samples, 0, (size_t)packet_samples * 2u * sizeof(int16_t));
++    }
 +    int accepted = 0;
 +    unsigned queued_buffers = 0;
 +    uint64_t start_failed_delta = 0;
@@ -612,7 +618,7 @@ index 459be77..4ba263a 100644
      d->monitor.queued_bytes_low = 1024;
      d->monitor.queued_bytes_high = 3072;
 
-@@ -252,6 +530,8 @@ void mcpx_apu_monitor_init(MCPXAPUState *d, Error **errp)
+@@ -252,6 +536,8 @@ void mcpx_apu_monitor_init(MCPXAPUState *d, Error **errp)
  void mcpx_apu_monitor_finalize(MCPXAPUState *d)
  {
      (void)d;
@@ -621,7 +627,7 @@ index 459be77..4ba263a 100644
      if (xa2_is_active()) {
          xa2_shutdown();
          return;
-@@ -270,96 +550,127 @@ void mcpx_apu_monitor_finalize(MCPXAPUState *d)
+@@ -270,96 +556,127 @@ void mcpx_apu_monitor_finalize(MCPXAPUState *d)
 
  void mcpx_apu_monitor_frame(MCPXAPUState *d)
  {
@@ -827,7 +833,7 @@ index 459be77..4ba263a 100644
  }
 
  /* ============================================================
-@@ -374,10 +685,9 @@ static void throttle(MCPXAPUState *d)
+@@ -374,10 +691,9 @@ static void throttle(MCPXAPUState *d)
 
      int64_t now_us = qemu_clock_get_us(QEMU_CLOCK_REALTIME);
 
@@ -841,7 +847,7 @@ index 459be77..4ba263a 100644
 
      while (!d->pause_requested) {
          now_us = qemu_clock_get_us(QEMU_CLOCK_REALTIME);
-@@ -388,7 +698,8 @@ static void throttle(MCPXAPUState *d)
+@@ -388,7 +704,8 @@ static void throttle(MCPXAPUState *d)
              break;
          }
      }
@@ -851,7 +857,7 @@ index 459be77..4ba263a 100644
 
      d->sleep_acc_us += (int)(qemu_clock_get_us(QEMU_CLOCK_REALTIME) - now_us);
  }
-@@ -432,13 +743,62 @@ static void se_frame(MCPXAPUState *d)
+@@ -432,13 +749,62 @@ static void se_frame(MCPXAPUState *d)
   * APU frame thread (background processing)
   * ============================================================ */
 
@@ -915,7 +921,7 @@ index 459be77..4ba263a 100644
              d->is_idle = true;
              qemu_cond_signal(&d->idle_cond);
              qemu_cond_wait(&d->cond, &d->lock);
-@@ -446,10 +806,24 @@ static void *mcpx_apu_frame_thread(void *arg)
+@@ -446,10 +812,24 @@ static void *mcpx_apu_frame_thread(void *arg)
              continue;
          }
 
@@ -944,7 +950,7 @@ index 459be77..4ba263a 100644
 
          int xcntmode = GET_MASK(qatomic_read(&d->regs[NV_PAPU_SECTL]),
                                  NV_PAPU_SECTL_XCNTMODE);
-@@ -458,16 +832,60 @@ static void *mcpx_apu_frame_thread(void *arg)
+@@ -458,16 +838,60 @@ static void *mcpx_apu_frame_thread(void *arg)
                            !(fectl & NV_PAPU_FECTL_FEMETHMODE_TRAPPED) &&
                            !(fectl & NV_PAPU_FECTL_FEMETHMODE_HALTED);
 
@@ -1005,7 +1011,7 @@ index 459be77..4ba263a 100644
      qemu_mutex_unlock(&d->lock);
      return NULL;
  }
-@@ -499,6 +917,7 @@ static void mcpx_apu_reset_locked(MCPXAPUState *d)
+@@ -499,6 +923,7 @@ static void mcpx_apu_reset_locked(MCPXAPUState *d)
  {
      memset(d->regs, 0, sizeof(d->regs));
      mcpx_apu_vp_reset(d);
@@ -1013,7 +1019,7 @@ index 459be77..4ba263a 100644
 
      if (d->gp.dsp) {
          memset((void *)d->gp.dsp->core.pram_opcache, 0,
-@@ -516,6 +935,11 @@ static void mcpx_apu_reset_locked(MCPXAPUState *d)
+@@ -516,6 +941,11 @@ static void mcpx_apu_reset_locked(MCPXAPUState *d)
   * ============================================================ */
 
  MCPXAPUState *mcpx_apu_init_standalone(uint8_t *ram_ptr)
@@ -1025,7 +1031,7 @@ index 459be77..4ba263a 100644
  {
      MCPXAPUState *d = (MCPXAPUState *)calloc(1, sizeof(MCPXAPUState));
      if (!d) {
-@@ -526,6 +950,14 @@ MCPXAPUState *mcpx_apu_init_standalone(uint8_t *ram_ptr)
+@@ -526,6 +956,14 @@ MCPXAPUState *mcpx_apu_init_standalone(uint8_t *ram_ptr)
      g_apu_ram_ptr = ram_ptr;
      g_state = d;
      d->ram_ptr = ram_ptr;
@@ -1040,7 +1046,7 @@ index 459be77..4ba263a 100644
 
      d->set_irq = false;
      d->exiting = false;
-@@ -546,13 +978,6 @@ MCPXAPUState *mcpx_apu_init_standalone(uint8_t *ram_ptr)
+@@ -546,13 +984,6 @@ MCPXAPUState *mcpx_apu_init_standalone(uint8_t *ram_ptr)
      /* Init software mixer for DirectSound bridge */
      mixer_init();
 
@@ -1054,7 +1060,7 @@ index 459be77..4ba263a 100644
      /* Start background frame thread */
      qemu_thread_create(&d->apu_thread, "mcpx.apu_thread",
                         mcpx_apu_frame_thread, d, QEMU_THREAD_JOINABLE);
-@@ -581,7 +1006,7 @@ void mcpx_apu_shutdown(MCPXAPUState *d)
+@@ -581,7 +1012,7 @@ void mcpx_apu_shutdown(MCPXAPUState *d)
 
      qemu_thread_join(&d->apu_thread);
      mcpx_apu_vp_finalize(d);
@@ -1063,7 +1069,7 @@ index 459be77..4ba263a 100644
 
      free(d);
      g_state = NULL;
-@@ -614,8 +1039,12 @@ void mcpx_apu_dispatch_mmio(MCPXAPUState *d, hwaddr addr, uint64_t val,
+@@ -614,8 +1045,12 @@ void mcpx_apu_dispatch_mmio(MCPXAPUState *d, hwaddr addr, uint64_t val,
          if (is_write) {
              mcpx_apu_write(d, addr, val, size);
          }
@@ -1077,7 +1083,7 @@ index 459be77..4ba263a 100644
  }
 
  /* ============================================================
-@@ -630,6 +1059,10 @@ uint64_t mcpx_apu_mmio_read(MCPXAPUState *d, uint64_t addr, unsigned int size)
+@@ -630,6 +1065,10 @@ uint64_t mcpx_apu_mmio_read(MCPXAPUState *d, uint64_t addr, unsigned int size)
          return mcpx_apu_vp_read(d, addr - 0x20000, size);
      } else if (addr < 0x20000) {
          return mcpx_apu_read(d, (hwaddr)addr, size);
