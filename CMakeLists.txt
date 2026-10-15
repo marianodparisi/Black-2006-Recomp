@@ -18,7 +18,7 @@ endif()
 add_subdirectory("${XBOXRECOMP_DIR}" "${CMAKE_BINARY_DIR}/xboxrecomp")
 file(GLOB RECOMP_GEN_SOURCES CONFIGURE_DEPENDS "src/recomp/gen/*.c")
 if(NOT RECOMP_GEN_SOURCES)
-    message(FATAL_ERROR "Run scripts/setup.ps1 with your retail BLACK Xbox files first.")
+    message(FATAL_ERROR "Supply your retail BLACK Xbox files, then run scripts/setup.ps1 on Windows or scripts/setup-linux.sh on Linux.")
 endif()
 
 add_executable(${PROJECT_NAME} WIN32
@@ -48,6 +48,10 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     xboxrecomp d3d11 dxgi dxguid xinput winmm dbghelp
 )
 if(MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE /bigobj /MP)
+    target_compile_options(${PROJECT_NAME} PRIVATE /bigobj)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE _CRT_SECURE_NO_WARNINGS)
+    if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+        target_compile_options(${PROJECT_NAME} PRIVATE /MP)
+    endif()
     target_link_options(${PROJECT_NAME} PRIVATE /LARGEADDRESSAWARE)
 endif()

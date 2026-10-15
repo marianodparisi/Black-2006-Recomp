@@ -539,9 +539,7 @@ unsigned black_vblank_hz(void)
  * microseconds on the game's main thread. The generated code now calls these for the constant-address forms. They
  * make the call the handler makes (apu_hook_handle_mmio -> mcpx_apu_mmio_read/write, offset from 0xFE800000). With
  * no emulated APU yet they touch the address as before, which faults for the handler. */
-extern void *g_apu_state;
-extern uint64_t mcpx_apu_mmio_read(void *d, uint64_t addr, unsigned int size);
-extern void mcpx_apu_mmio_write(void *d, uint64_t addr, uint64_t val, unsigned int size);
+extern MCPXAPUState *g_apu_state;
 
 uint32_t black_apu_r32(uint32_t va)
 {
@@ -2125,6 +2123,7 @@ extern uint32_t xbox_PhysicalAddressOf(uint32_t);
  * writes to that target. Transfer the aspect at that exact command word;
  * never let the asynchronous GPU sample current movie state. */
 static RECOMP_TLS uint32_t black_movie_frame_device;
+static RECOMP_TLS uint32_t black_movie_frame_crop;
 
 static uint32_t black_movie_frame_capable(void)
 {
@@ -2140,19 +2139,21 @@ static uint32_t black_movie_frame_capable(void)
 void black_movie_tag_flip(uint32_t parameter_va)
 {
     const unsigned csr=_mm_getcsr();
-    uint32_t device=black_movie_frame_device, physical;
+    uint32_t device=black_movie_frame_device, crop=black_movie_frame_crop, physical;
     black_movie_frame_device=0;
+    black_movie_frame_crop=0;
     if (device && device==GUEST32(BLACK_VA(0x27BFF8u)) &&
         black_pc_ram_span(parameter_va,4u)) {
         physical=xbox_PhysicalAddressOf(parameter_va);
         if (physical<0x08000000u)
-            kelvin_mark_frame_aspect(0x80000000u+physical,4u,3u);
+            kelvin_mark_frame_aspect(0x80000000u+physical,crop ? 20u : 4u,crop ? 11u : 3u);
     }
     _mm_setcsr(csr);
 }
 
 typedef struct BlackMovieRect {
     uint32_t address;
+    uint32_t crop;
     uint32_t saved[4];
     uint32_t replacement[4];
 } BlackMovieRect;
@@ -2181,7 +2182,8 @@ static int black_movie_prepare(uint32_t aspect, BlackMovieRect *result)
     if (aspect == 0x3FE38E39u) { left=0x42A00000u; right=0x440C0000u; }
     else if (aspect == 0x40155555u) { left=0x43092492u; right=0x43FB6DB7u; }
     else if (aspect == 0x40638E39u) { left=0x43480000u; right=0x43DC0000u; }
-    else return 0; /* Original, 4:3, and unsupported selectors. */
+    else if (!aspect || aspect == 0x3FAAAAABu) { left=0u; right=0x44200000u; }
+    else return 0;
 
     /* The original 121AAF call constructs these exact borrowed stack views:
      * origin=S+58, LTRB=S+60, pixel-UV=S+70, color=S+80, S=callee entry ESP.
@@ -2246,6 +2248,16 @@ static int black_movie_prepare(uint32_t aspect, BlackMovieRect *result)
                                   reads[i].address,reads[i].bytes)) return 0;
 
     result->address=rect;
+    /* The owned 02_n opening cinematic has a 640x352 picture at rows
+     * 64..415 in its 640x480 source. This explicit per-frame tag removes
+     * only that padding; credits, logos, widgets and other cuts retain
+     * their full frame. Do not infer a crop from dark/fading pixels. */
+    {
+        const char *stem=(const char *)((uintptr_t)g_xbox_mem_offset+manager+0x84u);
+        result->crop=stem[0]=='0' && stem[1]=='2' && stem[2]=='_' &&
+            (stem[3]=='n' || stem[3]=='N') && !stem[4];
+    }
+    if ((!aspect || aspect == 0x3FAAAAABu) && !result->crop) return 0;
     for (i=0;i<4u;i++) result->saved[i]=GUEST32(rect+i*4u);
     result->replacement[0]=left; result->replacement[1]=0u;
 #ifdef BLACK_MOVIE_MUTANT_WIDTH_AS_RIGHT
@@ -2269,7 +2281,10 @@ void sub_000D6C00(void)
     adjusted=black_movie_prepare(black_aspect_bits,&owned);
     device=adjusted ? black_movie_frame_capable() : 0;
     native_frame=device!=0;
-    if (native_frame) black_movie_frame_device=device;
+    if (native_frame) {
+        black_movie_frame_device=device;
+        black_movie_frame_crop=owned.crop;
+    }
     if (adjusted && !native_frame)
         for (i=0;i<4u;i++) GUEST32(owned.address+i*4u)=owned.replacement[i];
     sub_000D6C00_gen(); /* exactly once, including every fallback */

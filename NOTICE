@@ -4,7 +4,7 @@ BLACK 2006 Recomp — licensing and attribution
 Copyright (c) 2026 portingpete.
 
 The original host integration, generator adaptations, launcher, scripts and
-project documentation in this source-only repository are MIT licensed under
+project documentation in this repository are MIT licensed under
 LICENSE, except where a file or component carries a different notice.
 
 The runtime patch modifies xboxrecomp. Its MIT portions retain
@@ -30,6 +30,11 @@ No permission to distribute game files is granted by these software licenses.
 The generator requires a user's own matching retail original Xbox files.
 Generated game-function bodies, extracted assets, saves and game binaries
 are excluded from this repository.
+
+Starter releases include compiled MIT-licensed host launchers and their source.
+They contain no generated game-function bodies or retail files. The game is built
+locally from the user's matching retail files. Wine, Proton and DXVK are external
+runtime dependencies, not bundled or relicensed by this project.
 
 Preserved xboxrecomp NOTICE
 ==========================

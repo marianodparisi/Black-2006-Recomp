@@ -73,17 +73,32 @@ class MainUSBank:
             raise ValueError("MainUS record is not valid UTF-8") from error
         return StringRecord(record_id, text), end + 1
 
-    def rebuild(self, translations: Dict[int, str]) -> bytes:
+    def rebuild(self, translations: Dict[int, str], index_all: bool = False) -> bytes:
         missing = [record.record_id for record in self.records if record.record_id not in translations]
         if missing:
             raise ValueError("Missing translations for record IDs: " + ", ".join(hex(i) for i in missing[:8]))
-        output = bytearray(self.prefix)
+
+        if index_all:
+            indexed_records = sorted(
+                self.records,
+                key=lambda record: record.record_id if record.record_id < 0x80000000
+                else record.record_id - 0x100000000,
+            )
+            tail_records = []
+            table_end = self.table_offset + len(indexed_records) * 4
+            output = bytearray(_align4(table_end))
+            output[:self.table_offset] = self.prefix[:self.table_offset]
+            struct.pack_into("<H", output, 0, len(indexed_records))
+        else:
+            indexed_records = self.records[:self.indexed_count]
+            tail_records = self.records[self.indexed_count:]
+            output = bytearray(self.prefix)
+
         cursor = len(output)
-        for index, record in enumerate(self.records[:self.indexed_count]):
+        for index, record in enumerate(indexed_records):
             struct.pack_into("<I", output, self.table_offset + index * 4, cursor)
             pad = index + 1 < len(self.records)
             cursor = self._write_record(output, record.record_id, translations[record.record_id], pad)
-        tail_records = self.records[self.indexed_count:]
         for index, record in enumerate(tail_records):
             pad = index + 1 < len(tail_records)
             cursor = self._write_record(output, record.record_id, translations[record.record_id], pad)

@@ -43,8 +43,12 @@ def main():
 
     # The catalog omits unchanged strings; preserve those from the verified base.
     values = {record.record_id: localized.get(record.record_id, record.text) for record in source.records}
-    output = source.rebuild(values)
+    # Locale banks need every record in the hash index used by runtime lookup.
+    # Retaining the smaller English index leaves remaining records unsearchable.
+    output = source.rebuild(values, index_all=True)
     rebuilt = MainUSBank.parse(output)
+    if rebuilt.indexed_count != len(rebuilt.records):
+        raise ValueError("Rebuilt PT-BR MainUS search index does not include every record")
     if [record.record_id for record in rebuilt.records] != [record.record_id for record in source.records]:
         raise ValueError("Rebuilt PT-BR MainUS IDs or ordering differ from the English source")
     if [record.text for record in rebuilt.records] != [values[record.record_id] for record in source.records]:

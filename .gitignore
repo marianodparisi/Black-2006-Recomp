@@ -5,6 +5,7 @@
 /.venv/
 /.work/
 /build*/
+/bin/
 /local/
 /save/
 /reports/
@@ -18,3 +19,6 @@ __pycache__/
 *.xiso
 .env
 .env.*
+/releases/
+/.wine/
+/.proton/

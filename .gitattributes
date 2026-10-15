@@ -1,2 +1,5 @@
 *.patch text eol=lf
 tools/cross-macos/*.diff -text
+*.sh text eol=lf
+*.desktop text eol=lf
+*.cmd text eol=crlf

@@ -16,7 +16,7 @@ The default runtime path is `third_party/xboxrecomp`. Override it with
 `-DXBOXRECOMP_DIR=<absolute pinned, patched checkout>` for another checkout.
 The `Movie skip regression` workflow checks out the pinned runtime, verifies and
 applies the repository patch, builds the production `xbox_video` and `xbox_input`
-libraries, then runs all five CTest regressions in Release and Debug.
+libraries, then runs all seven CTest regressions in Release and Debug.
 
 - `movie-input` exercises Escape, Enter, Space, controller A/B/Start and left
   mouse: one-press startup skip, released second-press cutscene confirmation,
@@ -54,6 +54,11 @@ libraries, then runs all five CTest regressions in Release and Debug.
   and the harness rejects a build with `NDEBUG` still defined.
 - `movie-prompt-localization` checks the launcher prompt fragments for all six
   supported locales and the English fallback.
+- `movie-picture` checks screen-height fitting of the opening cinematic at
+  native and supersampled raster sizes, including integer/stretch settings,
+  narrower windows, and unchanged sizing of other movie and gameplay frames.
+  A custom 640x352 CPU raster stays unmodified; its dimensions cannot collide
+  with the reduced 20:11 cinematic aperture marker.
 - `movie-subtitle-catalog` parses every checked-in SRT, verifies the complete
   nine-stem by six-locale track matrix, and enforces the 255-unit parser limit
   while keeping a cue longer than the old 160-unit buffer in the catalog.

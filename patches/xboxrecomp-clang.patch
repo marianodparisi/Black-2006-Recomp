@@ -1,0 +1,9 @@
+diff --git a/src/nv2a/qemu_shim.h b/src/nv2a/qemu_shim.h
+--- a/src/nv2a/qemu_shim.h
++++ b/src/nv2a/qemu_shim.h
+@@ -57,4 +57,4 @@
+ /* For MSVC which doesn't have __builtin_ctz: */
+-#ifdef _MSC_VER
++#if defined(_MSC_VER) && !defined(__clang__)
+ #include <intrin.h>
+ static inline int __builtin_ctz(unsigned int x) {

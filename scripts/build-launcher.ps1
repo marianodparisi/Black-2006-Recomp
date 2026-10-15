@@ -71,12 +71,10 @@ if ($python) {
             $catalog = Join-Path $gameCatalogDir ($locale + '.jsonl')
             $bank = Join-Path $projectRoot ('local\language-banks\' + $locale + '\MainUS.bin')
             if (-not (Test-Path -LiteralPath $catalog)) { throw "The $locale game catalog is missing." }
-            if ($Force -or -not (Test-Path -LiteralPath $bank) -or
-                (Get-Item -LiteralPath $englishBank).LastWriteTimeUtc -gt (Get-Item -LiteralPath $bank).LastWriteTimeUtc -or
-                (Get-Item -LiteralPath $catalog).LastWriteTimeUtc -gt (Get-Item -LiteralPath $bank).LastWriteTimeUtc) {
-                & $python.Source @pythonArgs $bankBuilder $englishBank $catalog $bank
-                if ($LASTEXITCODE -ne 0) { throw "Could not generate the $locale MainUS bank." }
-            }
+            # Regenerate these small banks every build, as for PT-BR. Builder
+            # fixes must also replace cached banks with unchanged input timestamps.
+            & $python.Source @pythonArgs $bankBuilder $englishBank $catalog $bank
+            if ($LASTEXITCODE -ne 0) { throw "Could not generate the $locale MainUS bank." }
         }
     } else {
         Write-Output 'Skipped generated game-language banks: provide local\language-banks\en-US\MainUS.bin to build them.'

@@ -31,8 +31,10 @@ def main():
     expected = {record.record_id for record in source.records}
     if set(values) != expected:
         raise ValueError(f"catalog ID coverage differs: missing={len(expected-set(values))}, extra={len(set(values)-expected)}")
-    output = source.rebuild(values)
+    output = source.rebuild(values, index_all=True)
     rebuilt = MainUSBank.parse(output)
+    if rebuilt.indexed_count != len(rebuilt.records):
+        raise ValueError("Rebuilt locale MainUS search index does not include every record")
     if [record.record_id for record in rebuilt.records] != [record.record_id for record in source.records]:
         raise ValueError("rebuilt MainUS IDs or ordering do not match the source")
     if [record.text for record in rebuilt.records] != [values[record.record_id] for record in source.records]:

@@ -1,0 +1,74 @@
+name: Release launchers
+
+on:
+  pull_request:
+    paths:
+      - '*.sh'
+      - '*.cmd'
+      - '.gitattributes'
+      - 'scripts/**'
+      - 'cmake/**'
+      - 'patches/xboxrecomp-clang.patch'
+      - 'tests/linux_build/**'
+      - 'tests/launcher_language/**'
+      - '.github/workflows/release-launchers.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile both host entry points
+        shell: pwsh
+        run: ./scripts/build-launcher.ps1 -Force -OutputDirectory build-release-launchers
+      - name: Direct and portable launcher regressions without retail files
+        shell: pwsh
+        run: ./tests/launcher_language/test-direct-launch.ps1 -LauncherDirectory build-release-launchers
+      - name: Package and audit starter
+        shell: pwsh
+        run: |
+          python scripts/release/test_release.py
+          if ($LASTEXITCODE -ne 0) { throw 'Release tests failed' }
+          python scripts/release/build_release.py --version 0.1.0-alpha.2
+          if ($LASTEXITCODE -ne 0) { throw 'Release packaging failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BLACK-starter
+          path: releases/*
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Shell, path, prefix and package regressions
+        run: |
+          bash -n ./*.sh scripts/linux/launch.sh
+          python scripts/linux/test_launch.py
+          python scripts/release/test_release.py
+  linux-cross-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 clang-tools-18 llvm-18 lld-18 mono-devel python3-venv cmake ninja-build build-essential wine64
+      - name: Prepare pinned toolchain and build both launchers on Linux
+        run: bash scripts/setup-linux.sh --prepare-only
+      - name: Compile and run production runtime and Rust ABI check under Wine
+        run: bash scripts/linux/test_cross_build.sh
+      - name: Package Linux-built host launchers
+        run: python3 scripts/release/build_release.py --version 0.1.0-alpha.2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BLACK-starter-built-on-Linux
+          path: releases/*

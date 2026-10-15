@@ -75,6 +75,7 @@ extern RECOMP_TLS int g_fp_cmp;
 extern RECOMP_TLS RecompXmm g_xmm0, g_xmm1, g_xmm2, g_xmm3;
 extern RECOMP_TLS RecompXmm g_xmm4, g_xmm5, g_xmm6, g_xmm7;
 extern ptrdiff_t g_xbox_mem_offset;
+extern int recomp_dispatch_init(void);
 
 /* ── XBE Constants ─────────────────────────────────────────── */
 

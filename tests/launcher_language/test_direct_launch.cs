@@ -67,6 +67,7 @@ namespace BlackXboxLauncher
                 }
                 else
                     TestExecutables(project, workspace, Path.GetFullPath(args[1]), Path.GetFullPath(args[2]), settingsBytes, videoBytes, args.Length == 4 && args[3] == "--legacy");
+                TestPortableRelease(fixture, Path.GetFullPath(args[1]), args.Length >= 3 ? Path.GetFullPath(args[2]) : null);
                 Console.WriteLine("PASS: " + checks + " direct launcher checks.");
                 return 0;
             }
@@ -115,6 +116,34 @@ namespace BlackXboxLauncher
         private static int Run(string executable, string arguments)
         {
             return RunDetailed(executable, arguments).ExitCode;
+        }
+
+        private static void TestPortableRelease(string fixture, string staged, string ownedRoot)
+        {
+            string root = Path.Combine(fixture, "portable release with spaces");
+            Directory.CreateDirectory(root);
+            File.WriteAllText(Path.Combine(root, "black-release.json"), "{}");
+            Check(Program.FindProject(root) == root, "Portable releases are found without source or scripts.");
+            string legacy = GameSession.Executable(root);
+            Check(legacy == Path.Combine(root, "build-vs2022", "Release", "black_xbox_recomp.exe"), "Starter releases can use the normal build output.");
+            string engine = Path.Combine(root, "bin", "black_xbox_recomp.exe");
+            Directory.CreateDirectory(Path.GetDirectoryName(engine));
+            File.Copy(Assembly.GetExecutingAssembly().Location, engine);
+            Check(GameSession.Executable(root) == engine, "A portable bin executable takes precedence.");
+            string main = Path.Combine(root, "BLACK PC Launcher.exe");
+            File.Copy(Path.Combine(staged, "BLACK PC Launcher.exe"), main);
+            ProcessResult missing = RunDetailed(main, "--check");
+            Check(missing.ExitCode == 1 && missing.StandardError.Contains("The original BLACK game executable is missing"), "Portable check discovers the release and reports missing assets.");
+            Check(!Directory.Exists(Path.Combine(root, "reports")), "Portable failed checks do not create sessions.");
+            if (ownedRoot == null) return;
+            Directory.CreateDirectory(Path.Combine(root, "game", "language", "strings"));
+            File.Copy(Path.Combine(ownedRoot, "game", "default.xbe"), Path.Combine(root, "game", "default.xbe"));
+            File.Copy(GameLanguageBanks.GamePath(ownedRoot), GameLanguageBanks.GamePath(root));
+            File.WriteAllText(Path.Combine(root, "game", "GlobData.bin"), "synthetic asset");
+            foreach (string folder in new[] { "levels", "sound", "videos" }) Directory.CreateDirectory(Path.Combine(root, "game", folder));
+            Check(Run(main, "--check") == 0, "Portable retail check succeeds from bin layout.");
+            Check(Run(main, "") == 0 && File.Exists(Path.Combine(root, "synthetic-game.json")), "Portable one-click play starts its child with the release working directory.");
+            Check(Directory.GetDirectories(Path.Combine(root, "reports"), "launcher-*").Length == 1, "Portable play retains session diagnostics.");
         }
 
         private static void TestAssetFreeExecutables(string project, string workspace, string staged,

@@ -35738,10 +35738,10 @@ index 2189a3b..175c522 100644
 +    target_link_libraries(xbox_video PUBLIC mfplat mfreadwrite mfuuid mf ole32 gdi32 user32)
  endif()
 diff --git a/src/video/fb_present.c b/src/video/fb_present.c
-index 69ced11..ae24eed 100644
+index 69ced11..d2cc468 100644
 --- a/src/video/fb_present.c
 +++ b/src/video/fb_present.c
-@@ -1,219 +1,977 @@
+@@ -1,219 +1,985 @@
 -/**
 - * Show the guest framebuffer in a window.
 - *
@@ -35796,7 +35796,7 @@ index 69ced11..ae24eed 100644
 +    ID3D11Device *device; ID3D11DeviceContext *context;
 +    IDXGISwapChain1 *swap; ID3D11RenderTargetView *target;
 +    ID3D11Texture2D *texture; ID3D11ShaderResourceView *view;
-+    ID3D11VertexShader *vs; ID3D11PixelShader *ps;
++    ID3D11VertexShader *vs, *vs_cinematic; ID3D11PixelShader *ps;
 +    ID3D11SamplerState *linear, *point; ID3D11RasterizerState *raster;
 +    unsigned width, height, tex_width, tex_height, tearing;
 +    ID3D11DeviceContext4 *ctx4; ID3D11Fence *frame_fence, *done_fence;
@@ -36414,7 +36414,7 @@ index 69ced11..ae24eed 100644
 +    { unsigned i; for (i = 0; i < FB_GPU_SLOTS; ++i) { FB_RELEASE(g->shared_srv[i]); FB_RELEASE(g->shared_tex[i]); } }
 +    FB_RELEASE(g->frame_fence); FB_RELEASE(g->done_fence); FB_RELEASE(g->ctx4);
 +    FB_RELEASE(g->ovl_view); FB_RELEASE(g->ovl_tex); FB_RELEASE(g->ovl_blend); FB_RELEASE(g->ovl_ps);
-+    FB_RELEASE(g->raster); FB_RELEASE(g->point); FB_RELEASE(g->linear); FB_RELEASE(g->ps); FB_RELEASE(g->vs);
++    FB_RELEASE(g->raster); FB_RELEASE(g->point); FB_RELEASE(g->linear); FB_RELEASE(g->ps); FB_RELEASE(g->vs); FB_RELEASE(g->vs_cinematic);
 +    FB_RELEASE(g->view); FB_RELEASE(g->texture); FB_RELEASE(g->target); FB_RELEASE(g->swap);
 +    FB_RELEASE(g->context); FB_RELEASE(g->device);
 +}
@@ -36438,11 +36438,12 @@ index 69ced11..ae24eed 100644
 +        "struct V{float4 p:SV_Position;float2 uv:TEXCOORD0;};"
 +        "V vs(uint i:SV_VertexID){V v;float2 uv=float2((i<<1)&2,i&2);"
 +        "v.p=float4(uv.x*2-1,1-uv.y*2,0,1);v.uv=uv;return v;}"
++        "V vs_cinematic(uint i:SV_VertexID){V v=vs(i);v.uv.y=(v.uv.y*352+64)/480;return v;}"
 +        "float4 ps(V v):SV_Target{return float4(image.Sample(filter,v.uv).rgb,1);}"
 +        "float4 ps_ovl(V v):SV_Target{return image.Sample(filter,v.uv);}";
 +    IDXGIDevice *dxgi_device = NULL; IDXGIAdapter *adapter = NULL;
 +    IDXGIFactory2 *factory = NULL; IDXGIFactory5 *factory5 = NULL;
-+    ID3DBlob *vs = NULL, *ps = NULL, *ps_ovl = NULL, *errors = NULL; D3D_FEATURE_LEVEL level;
++    ID3DBlob *vs = NULL, *vs_cinematic = NULL, *ps = NULL, *ps_ovl = NULL, *errors = NULL; D3D_FEATURE_LEVEL level;
 +    D3D11_BLEND_DESC blend = {0};
 +    DXGI_SWAP_CHAIN_DESC1 swap = {0}; D3D11_SAMPLER_DESC sampler = {0};
 +    D3D11_RASTERIZER_DESC raster = {0}; RECT client; HRESULT hr; BOOL tearing = FALSE;
@@ -36478,6 +36479,8 @@ index 69ced11..ae24eed 100644
 +    FB_TRY(D3DCompile(shader, sizeof(shader) - 1, "framebuffer-present", NULL, NULL,
 +        "vs", "vs_4_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &vs, &errors)); FB_RELEASE(errors);
 +    FB_TRY(D3DCompile(shader, sizeof(shader) - 1, "framebuffer-present", NULL, NULL,
++        "vs_cinematic", "vs_4_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &vs_cinematic, &errors)); FB_RELEASE(errors);
++    FB_TRY(D3DCompile(shader, sizeof(shader) - 1, "framebuffer-present", NULL, NULL,
 +        "ps", "ps_4_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &ps, &errors));
 +    FB_TRY(D3DCompile(shader, sizeof(shader) - 1, "framebuffer-present", NULL, NULL,
 +        "ps_ovl", "ps_4_0", D3DCOMPILE_ENABLE_STRICTNESS, 0, &ps_ovl, &errors)); FB_RELEASE(errors);
@@ -36491,6 +36494,8 @@ index 69ced11..ae24eed 100644
 +    FB_TRY(ID3D11Device_CreateBlendState(g->device, &blend, &g->ovl_blend));
 +    FB_TRY(ID3D11Device_CreateVertexShader(g->device, vs->lpVtbl->GetBufferPointer(vs),
 +        vs->lpVtbl->GetBufferSize(vs), NULL, &g->vs));
++    FB_TRY(ID3D11Device_CreateVertexShader(g->device, vs_cinematic->lpVtbl->GetBufferPointer(vs_cinematic),
++        vs_cinematic->lpVtbl->GetBufferSize(vs_cinematic), NULL, &g->vs_cinematic));
 +    FB_TRY(ID3D11Device_CreatePixelShader(g->device, ps->lpVtbl->GetBufferPointer(ps),
 +        ps->lpVtbl->GetBufferSize(ps), NULL, &g->ps));
 +    sampler.AddressU = sampler.AddressV = sampler.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -36503,7 +36508,7 @@ index 69ced11..ae24eed 100644
 +    FB_TRY(ID3D11Device_CreateRasterizerState(g->device, &raster, &g->raster));
 +done:
 +    if (FAILED(hr) && errors) fprintf(stderr, "[FBWIN] shader: %s\n", (char *)errors->lpVtbl->GetBufferPointer(errors));
-+    FB_RELEASE(errors); FB_RELEASE(ps_ovl); FB_RELEASE(ps); FB_RELEASE(vs); FB_RELEASE(factory5); FB_RELEASE(factory);
++    FB_RELEASE(errors); FB_RELEASE(ps_ovl); FB_RELEASE(ps); FB_RELEASE(vs); FB_RELEASE(vs_cinematic); FB_RELEASE(factory5); FB_RELEASE(factory);
 +    FB_RELEASE(adapter); FB_RELEASE(dxgi_device); return hr;
 +}
 +/* RECOMP_FB_DUMP: write what the presenter is about to show (a GPU frame has no CPU copy). */
@@ -36635,7 +36640,9 @@ index 69ced11..ae24eed 100644
 +    ID3D11DeviceContext_RSSetViewports(g->context, 1, &viewport); ID3D11DeviceContext_RSSetState(g->context, g->raster);
 +    ID3D11DeviceContext_IASetInputLayout(g->context, NULL);
 +    ID3D11DeviceContext_IASetPrimitiveTopology(g->context, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-+    ID3D11DeviceContext_VSSetShader(g->context, g->vs, NULL, 0); ID3D11DeviceContext_PSSetShader(g->context, g->ps, NULL, 0);
++    ID3D11DeviceContext_VSSetShader(g->context,
++        fb_cinematic_crop(frame->aspect_w, frame->aspect_h) ? g->vs_cinematic : g->vs, NULL, 0);
++    ID3D11DeviceContext_PSSetShader(g->context, g->ps, NULL, 0);
 +    ID3D11DeviceContext_PSSetSamplers(g->context, 0, 1, &sampler);
 +    ID3D11DeviceContext_PSSetShaderResources(g->context, 0, 1, &view); ID3D11DeviceContext_Draw(g->context, 3, 0);
 +    if (g->overlay_on && g->ovl_view && g->ovl_ps && g->ovl_blend) {
@@ -36643,6 +36650,7 @@ index 69ced11..ae24eed 100644
 +        ID3D11SamplerState *ovl_sampler = g->ovl_w == g->width && g->ovl_h == g->height ? g->point : g->linear;
 +        viewport.TopLeftX = 0; viewport.TopLeftY = 0; viewport.Width = (FLOAT)g->width; viewport.Height = (FLOAT)g->height;
 +        ID3D11DeviceContext_RSSetViewports(g->context, 1, &viewport);
++        ID3D11DeviceContext_VSSetShader(g->context, g->vs, NULL, 0);
 +        ID3D11DeviceContext_OMSetBlendState(g->context, g->ovl_blend, factor, 0xFFFFFFFFu);
 +        ID3D11DeviceContext_PSSetShader(g->context, g->ovl_ps, NULL, 0);
 +        ID3D11DeviceContext_PSSetSamplers(g->context, 0, 1, &ovl_sampler);
@@ -36960,10 +36968,10 @@ index 0000000..582f099
 +#endif
 diff --git a/src/video/fb_present_policy.h b/src/video/fb_present_policy.h
 new file mode 100644
-index 0000000..15dfe54
+index 0000000..c6bbbe6
 --- /dev/null
 +++ b/src/video/fb_present_policy.h
-@@ -0,0 +1,92 @@
+@@ -0,0 +1,102 @@
 +#ifndef XBOXRECOMP_FB_PRESENT_POLICY_H
 +#define XBOXRECOMP_FB_PRESENT_POLICY_H
 +
@@ -37022,6 +37030,15 @@ index 0000000..15dfe54
 +    if (!strcmp(aspect, "32:9")) { p->aspect_w = 32; p->aspect_h = 9; }
 +}
 +
++/* Exact 20:11 metadata opts into the known BLACK cinematic aperture:
++ * source rows 64..415 of 480, including when the host raster is larger.
++ * Reduced values cannot collide with ordinary source raster dimensions.
++ * It travels with the completed frame, never with current decoder state. */
++static unsigned fb_cinematic_crop(unsigned aspect_w, unsigned aspect_h)
++{
++    return aspect_w == 20u && aspect_h == 11u;
++}
++
 +static FbPresentRect fb_present_rect(unsigned client_w, unsigned client_h,
 +    unsigned source_w, unsigned source_h, unsigned scale, unsigned nearest,
 +    unsigned aspect_w, unsigned aspect_h)
@@ -37029,6 +37046,7 @@ index 0000000..15dfe54
 +    FbPresentRect r = { 0, 0, 0, 0, nearest };
 +    uint64_t w, h;
 +    if (!client_w || !client_h || !source_w || !source_h) return r;
++    if (fb_cinematic_crop(aspect_w, aspect_h)) scale = FB_SCALE_FIT;
 +    w = client_w; h = client_h;
 +    if (scale == FB_SCALE_INTEGER) {
 +        unsigned kx = client_w / source_w, ky = client_h / source_h;
