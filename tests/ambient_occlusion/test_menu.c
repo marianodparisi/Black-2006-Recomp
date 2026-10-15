@@ -94,6 +94,7 @@ static int f_gamecode(void *ctx, const char *name, const char *const args[3], in
     if (!strcmp(name, "ToggleVibration")) value_set("FEVibration", atoi(args[0]));
     if (!strcmp(name, "SetSfxValue")) value_set("FESFXVolume", atoi(args[0]));
     if (!strcmp(name, "SetMusicValue")) value_set("FEMusicVolume", atoi(args[0]));
+    if (!strcmp(name, "ChangeDifficulty")) value_set("FEDifficulty", atoi(args[0]));
     return 1;
 }
 
@@ -747,6 +748,71 @@ static void test_pointer(void)
     log_clear();
     click("PauseMenuOptionXbox");
     CHECK(log_is("gamecode ToggleCrouchOnOff 0 0 0\n"), "a click on the right of a toggle row is OFF: '%s'", g_log);
+}
+
+/* The native Difficulty page (the original choosedifficulty ActionScript): choosing the current difficulty leaves;
+ * choosing the other changes it and asks, YES keeps it and leaves, NO puts the earlier one back. Hard needs
+ * FEDifficultyHard. */
+static void test_difficulty(void)
+{
+    static const char def[] =
+        "[page Difficulty]\n"
+        "title = $FE_DIFFICULTY\n"
+        "list = 319.5 165 25\n"
+        "focus = 1\n"
+        "back = page blacktitlemenu2\n"
+        "item = $FE_NORMAL | gamecode StartNewMission | if FEDifficulty=1\n"
+        "item = $FE_NORMAL | gamecode ChangeDifficulty 1; set FEDifficultyBefore 2; open DifficultyWarning | unless FEDifficulty=1\n"
+        "item = $FE_HARD | gamecode StartNewMission | if FEDifficulty=2\n"
+        "item = $FE_HARD | gamecode ChangeDifficulty 2; set FEDifficultyBefore 1; open DifficultyWarning | unless FEDifficulty=2 | disabled unless FEDifficultyHard\n"
+        "[page DifficultyWarning]\n"
+        "text = 301 188 $FE_DIFFICULTYWARNING | wrap 300\n"
+        "list = 300.5 295 25\n"
+        "focus = 2\n"
+        "back = gamecode ChangeDifficulty @FEDifficultyBefore; close\n"
+        "item = $FE_YES | close; gamecode StartNewMission\n"
+        "item = $FE_NO | gamecode ChangeDifficulty @FEDifficultyBefore; close\n"
+        ;
+    reset_game();
+    value_set("FEDifficulty", 1); value_set("FEDifficultyHard", 0);
+    pc_menu_test_reset(def);
+    tick("");
+    CHECK(tick("Difficulty") == 1, "Difficulty is native");
+    CHECK(pc_menu_test_focus() == 0, "focus starts on Normal (%d)", pc_menu_test_focus());
+    log_clear();
+    press(PCM_ACT_DOWN, "Difficulty");
+    CHECK(pc_menu_test_focus() == 0, "locked Hard is not offered (%d)", pc_menu_test_focus());
+    log_clear();
+    press(PCM_ACT_CONFIRM, "Difficulty");
+    CHECK(strstr(g_log, "gamecode StartNewMission 0 0 0") && !strstr(g_log, "ChangeDifficulty"),
+          "choosing the current difficulty leaves: '%s'", g_log);
+
+    reset_game();
+    value_set("FEDifficulty", 1); value_set("FEDifficultyHard", 1);
+    pc_menu_test_reset(def);
+    tick(""); tick("Difficulty");
+    press(PCM_ACT_DOWN, "Difficulty");
+    CHECK(pc_menu_test_focus() == 3, "unlocked Hard follows Normal (%d)", pc_menu_test_focus());
+    log_clear();
+    press(PCM_ACT_CONFIRM, "Difficulty");
+    CHECK(strstr(g_log, "gamecode ChangeDifficulty 2 0 0") != NULL, "choosing Hard changes it: '%s'", g_log);
+    tick("Difficulty");
+    CHECK(pc_menu_test_focus() == 1, "the warning starts on NO (%d)", pc_menu_test_focus());
+    log_clear();
+    press(PCM_ACT_CONFIRM, "Difficulty");
+    CHECK(strstr(g_log, "gamecode ChangeDifficulty 1 0 0") && !strstr(g_log, "StartNewMission"),
+          "NO puts Normal back without leaving: '%s'", g_log);
+    tick("Difficulty");
+    CHECK(pc_menu_test_focus() == 3, "back on the page, the focus is where it was, on Hard (%d)", pc_menu_test_focus());
+
+    press(PCM_ACT_CONFIRM, "Difficulty");
+    tick("Difficulty");
+    press(PCM_ACT_UP, "Difficulty");
+    CHECK(pc_menu_test_focus() == 0, "up reaches YES (%d)", pc_menu_test_focus());
+    log_clear();
+    press(PCM_ACT_CONFIRM, "Difficulty");
+    CHECK(strstr(g_log, "gamecode StartNewMission 0 0 0") && !strstr(g_log, "ChangeDifficulty"),
+          "YES keeps Hard and leaves: '%s'", g_log);
 }
 
 static void test_mission_failed(void)
@@ -1444,6 +1510,7 @@ int main(int argc, char **argv)
     test_video_setting_focus_and_layout();
     test_input();
     test_pointer();
+    test_difficulty();
     test_native_video_shortcuts();
     if (g_have_files) test_objectives();
     if (g_have_files) test_render();

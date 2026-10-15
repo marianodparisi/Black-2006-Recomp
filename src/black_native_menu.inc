@@ -309,11 +309,47 @@ static const char black_menu_definition[] =
 "prompts_at = 298 398 28\r\n"
 "back = close\r\n"
 "item = $FE_YES | exit\r\n"
-"item = $FE_NO | close\r\n";
+"item = $FE_NO | close\r\n"
+"\r\n"
+"; Choosing the difficulty for a new game (the original choosedifficulty page, opened by START MISSION). The game\r\n"
+"; numbers it FEDifficulty: 1 normal, 2 hard; hard is offered once FEDifficultyHard says it is unlocked. The original\r\n"
+"; changes it as the choice moves (ChangeDifficulty) and asks when it differs from the one the page opened with; the\r\n"
+"; game starts the mission with SelectDifficulty (LeaveDifficultyMenu is the Options variant, back to Options).\r\n"
+"[page Difficulty]\r\n"
+"column = 00000000\r\n"
+"logo = 299.5 54\r\n"
+"rails = 105 268\r\n"
+"title = $FE_DIFFICULTY\r\n"
+"title_at = 320 110\r\n"
+"list = 319.5 165 25\r\n"
+"prompts = select confirm\r\n"
+"prompts_at = 317 398 28\r\n"
+"focus = 1\r\n"
+"back = page blacktitlemenu2\r\n"
+"item = $FE_NORMAL | gamecode StartNewMission | if FEDifficulty=1\r\n"
+"item = $FE_NORMAL | gamecode ChangeDifficulty 1; set FEDifficultyBefore 2; open DifficultyWarning | unless FEDifficulty=1\r\n"
+"item = $FE_HARD | gamecode StartNewMission | if FEDifficulty=2\r\n"
+"item = $FE_HARD | gamecode ChangeDifficulty 2; set FEDifficultyBefore 1; open DifficultyWarning | unless FEDifficulty=2 | disabled unless FEDifficultyHard\r\n"
+"\r\n"
+"; The question after a change, in the look of the front end's own questions (focus starts on NO, as the original).\r\n"
+"[page DifficultyWarning]\r\n"
+"column = 00000000\r\n"
+"logo = 282.5 54\r\n"
+"rails = 94 247\r\n"
+"text = 301 188 $FE_DIFFICULTYWARNING | wrap 300\r\n"
+"list = 300.5 295 25\r\n"
+"focus = 2\r\n"
+"prompts = select confirm\r\n"
+"prompts_at = 298 398 28\r\n"
+"back = gamecode ChangeDifficulty @FEDifficultyBefore; close\r\n"
+"item = $FE_YES | close; gamecode StartNewMission\r\n"
+"item = $FE_NO | gamecode ChangeDifficulty @FEDifficultyBefore; close\r\n";
 
 /* The built-in definitions of earlier builds (FNV-1a 64 of the whole file): a local\menus.ini that is still exactly
- * one of them was never edited and is brought up to date. 1: the in-game pages only (2026-10-05). */
-static const uint64_t black_menu_replaced[] = { 0xD8419D900AB2FEA6ull, 0xBBE0D874943DB641ull, 0x9F7652C358180DC6ull };
+ * one of them was never edited and is brought up to date. 1: the in-game pages only (2026-10-05); 4: before
+ * the Difficulty page (2026-10-15). */
+static const uint64_t black_menu_replaced[] = { 0xD8419D900AB2FEA6ull, 0xBBE0D874943DB641ull, 0x9F7652C358180DC6ull,
+    0xFF74A7E07CF4C7F0ull };
 
 /* ---- guest helpers --------------------------------------------------------------------------------------- */
 
