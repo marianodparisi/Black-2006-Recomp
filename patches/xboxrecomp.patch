@@ -12439,7 +12439,7 @@ new file mode 100644
 index 0000000..d00641c
 --- /dev/null
 +++ b/src/nv2a/kelvin/kelvin_gpu_async.inc
-@@ -0,0 +1,583 @@
+@@ -0,0 +1,661 @@
 +/* Asynchronous submission, included by kelvin_gpu.c after the draw, clear and flip it hands over.
 + *
 + * The pusher thread (A) parses the pushbuffer and works out each draw; the Direct3D work of drawing it -- the textures,
@@ -12710,8 +12710,86 @@ index 0000000..d00641c
 +    return p >= base && p < base + KELVIN_PHYS_SIZE;
 +}
 +
-+void kgpu_draw(const KGpuDraw *d)
++/* A wide aspect keeps the game's 2D layer in the centred 4:3 part of the picture. Something meant to cover the whole
++ * screen in one colour then stops there -- the black behind a cutscene's title card ("4 DAYS EARLIER_") left the
++ * scene showing at the sides. Such a draw is one quad, shaded on the GPU, whose positions are the centred 4:3 area at
++ * full height and whose texture coordinates stay inside a small patch of the texture (BLACK's 2D layer fills with an
++ * 11 x 11 solid block of its font page; an image spans far more of its texture): it is drawn
++ * from a copy of its positions widened to the picture's edges. A 4:3 image (a menu background, a loading screen)
++ * keeps its place and proportions. RECOMP_KGPU_WIDE_FILL=0 turns it off. */
++static const KGpuDraw *kg_widen_solid_fill(const KGpuDraw *d, KGpuDraw *dcopy, KGpuVsDraw *gcopy, uint8_t *buf, size_t cap)
 +{
++    static int on = -1;
++    const KGpuAttrSrc *pos;
++    const unsigned aspect = pc_video_aspect();
++    float W, H, l = 0, r = 0, t = 0, b = 0;
++    size_t bytes;
++    uint32_t i;
++    int a;
++    if (on < 0) { const char *e = getenv("RECOMP_KGPU_WIDE_FILL"); on = !(e && *e == '0'); }
++    if (!on || aspect == PCV_ASPECT_ORIGINAL || aspect == PCV_ASPECT_4_3 || !d->gvs || !d->indices ||
++        d->icount != 6 || d->topology != KG_TOPO_LIST)
++        return d;
++    pos = &d->gvs->attr[0];
++    if (pos->fmt != 4 || pos->count < 2 || pos->stride < 8 || !pos->data || pos->lo < 0 || pos->hi <= pos->lo) return d;
++    bytes = (size_t)(pos->hi - pos->lo);
++    if (bytes > cap) return d;
++    W = (float)(d->t->guest_width ? d->t->guest_width : d->t->width);
++    H = (float)(d->t->guest_height ? d->t->guest_height : d->t->height);
++    if (W < 64.0f || H < 64.0f) return d;
++    for (i = 0; i < 6; i++) {
++        const uint32_t e = d->indices[i];
++        const float *v;
++        if ((int64_t)e * pos->stride < pos->lo || (int64_t)e * pos->stride + 8 > pos->hi) return d;
++        v = (const float *)(pos->data + (size_t)e * pos->stride);
++        if (!isfinite(v[0]) || !isfinite(v[1])) return d;
++        if (!i || v[0] < l) l = v[0];
++        if (!i || v[0] > r) r = v[0];
++        if (!i || v[1] < t) t = v[1];
++        if (!i || v[1] > b) b = v[1];
++    }
++    if (t > 0.5f || b < H - 0.5f || l < 1.0f || r > W - 1.0f || fabsf(l + r - W) > 1.0f || (r - l) < 0.5f * W)
++        return d;                                       /* not the centred area at full height */
++    for (a = 1; a < 16; a++) {                          /* a solid colour: a small patch of the texture */
++        const KGpuAttrSrc *as = &d->gvs->attr[a];
++        float lo2[2], hi2[2];
++        if (as->fmt != 4 || as->count < 2) continue;
++        for (i = 0; i < 6; i++) {
++            const uint32_t e = d->indices[i];
++            const float *v;
++            if (!as->data || (int64_t)e * as->stride < as->lo || (int64_t)e * as->stride + 8 > as->hi) return d;
++            v = (const float *)(as->data + (size_t)e * as->stride);
++            if (!i) { lo2[0] = hi2[0] = v[0]; lo2[1] = hi2[1] = v[1]; continue; }
++            if (v[0] < lo2[0]) lo2[0] = v[0];
++            if (v[0] > hi2[0]) hi2[0] = v[0];
++            if (v[1] < lo2[1]) lo2[1] = v[1];
++            if (v[1] > hi2[1]) hi2[1] = v[1];
++        }
++        if (hi2[0] - lo2[0] > 0.125f || hi2[1] - lo2[1] > 0.125f) return d;
++    }
++    memcpy(buf, pos->data + pos->lo, bytes);
++    for (i = 0; i < 6; i++) {
++        float *v = (float *)(buf + ((size_t)d->indices[i] * pos->stride - (size_t)pos->lo));
++        v[0] = v[0] < W * 0.5f ? 0.0f : W;
++    }
++    *gcopy = *d->gvs;
++    gcopy->attr[0].data = buf - pos->lo;
++    *dcopy = *d;
++    dcopy->gvs = gcopy;
++    dcopy->clean = 0;
++    {
++        static int said;
++        if (!said) { said = 1; fprintf(stderr, "[KGPU] solid 4:3 fill x %.1f..%.1f of %.0f widened to the edges\n", l, r, W); }
++    }
++    return dcopy;
++}
++
++void kgpu_draw(const KGpuDraw *d_in)
++{
++    KGpuDraw wide_d;
++    KGpuVsDraw wide_g;
++    static uint8_t wide_buf[1024];
++    const KGpuDraw *d = kg_widen_solid_fill(d_in, &wide_d, &wide_g, wide_buf, sizeof(wide_buf));
 +    uint8_t *p, *q;
 +    KgDraw *k;
 +    uint32_t flags = 0;
