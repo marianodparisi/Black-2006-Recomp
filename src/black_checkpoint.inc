@@ -48,9 +48,9 @@ static int black_cp_context(BlackCheckpointContext *c, int buffers)
 {
     uint32_t manager, guns;
     memset(c, 0, sizeof(*c));
-    c->core = GUEST32(0x2D45D4u);
-    c->main = GUEST32(0x2D45F0u);
-    manager = GUEST32(0x2D19B4u);
+    c->core = GUEST32(BLACK_VA(0x2D45D4u));
+    c->main = GUEST32(BLACK_VA(0x2D45F0u));
+    manager = GUEST32(BLACK_VA(0x2D19B4u));
     if (!black_pc_ram_span(c->core, 0x5CB4u) ||
         !black_pc_ram_span(c->main, 0x21090u) || !black_pc_ram_span(manager, 4u)) return 0;
     c->profile = GUEST32(manager);
@@ -64,14 +64,14 @@ static int black_cp_context(BlackCheckpointContext *c, int buffers)
     if (!black_pc_ram_span(c->header, 0x13u) ||
         !black_cp_memory(c->header)[0x11] || black_cp_memory(c->header)[0x11] > 127u) return 0;
     if (!buffers) return 1;
-    guns = GUEST32(0x2D12D0u);
+    guns = GUEST32(BLACK_VA(0x2D12D0u));
     if (!black_pc_ram_span(guns, 4u)) return 0;
     c->gun_header = GUEST32(guns);
     if (!black_pc_ram_span(c->gun_header, 8u)) return 0;
     c->gun_count = black_cp_memory(c->gun_header)[1];
     c->objective_count = GUEST32(c->core + 0x934u);
     c->objective_data = GUEST32(c->core + 0x930u);
-    c->objective_backup = GUEST32(0x2F3BFCu);
+    c->objective_backup = GUEST32(BLACK_VA(0x2F3BFCu));
     c->inventory = GUEST32(c->core + 0x440u);
     return c->gun_count && c->gun_count <= BLACK_CP_MAX_GUNS &&
         c->objective_count <= BLACK_CP_MAX_OBJECTIVES &&
@@ -153,17 +153,17 @@ static void black_cp_save(void)
     BlackCheckpointContext c;
     BlackCheckpoint *cp;
     char path[160];
-    if (!black_cp_memory(0x2F3BF8u)[0] || !black_cp_context(&c, 1)) return;
+    if (!black_cp_memory(BLACK_VA(0x2F3BF8u))[0] || !black_cp_context(&c, 1)) return;
     cp = (BlackCheckpoint *)calloc(1, sizeof(*cp));
     if (!cp) return;
     black_cp_identity(cp, &c);
-    cp->unit = GUEST32(0x2A7EDCu);
+    cp->unit = GUEST32(BLACK_VA(0x2A7EDCu));
     if (cp->unit < 2u || cp->unit > black_cp_memory(c.header)[0x11]) { free(cp); return; }
     cp->objectives = c.objective_count;
     cp->guns = c.gun_count;
     memcpy(cp->player, black_cp_memory(c.core + 0x3F0u), 80);
-    memcpy(cp->stats, black_cp_memory(0x2F3BF4u), 4);
-    memcpy(cp->stats + 4, black_cp_memory(0x2F3C00u), 16);
+    memcpy(cp->stats, black_cp_memory(BLACK_VA(0x2F3BF4u)), 4);
+    memcpy(cp->stats + 4, black_cp_memory(BLACK_VA(0x2F3C00u)), 16);
     memcpy(cp->inventory, black_cp_memory(c.inventory), c.gun_count);
     {
         uint32_t i;
@@ -241,7 +241,7 @@ static void black_cp_load(uint32_t core)
     uint32_t checksum, parity;
     int complete;
     /* A live checkpoint is already authoritative, including after death. */
-    if (black_cp_memory(0x2F3BF8u)[0] || !black_cp_context(&c, 1) || core != c.core) return;
+    if (black_cp_memory(BLACK_VA(0x2F3BF8u))[0] || !black_cp_context(&c, 1) || core != c.core) return;
     black_cp_path(&c, path);
     if (!strcmp(path, black_cp_discarded)) return;
     file = fopen(path, "rb");
@@ -268,10 +268,10 @@ static void black_cp_load(uint32_t core)
             memcpy(black_cp_memory(entry + 4u), cp->objective_data + i * 16u + 8u, 8u);
         }
     }
-    memcpy(black_cp_memory(0x2F3BF4u), cp->stats, 4);
-    memcpy(black_cp_memory(0x2F3C00u), cp->stats + 4, 16);
-    GUEST32(0x2A7EDCu) = cp->unit;
-    GUEST32(0x2EC464u) = 1;
+    memcpy(black_cp_memory(BLACK_VA(0x2F3BF4u)), cp->stats, 4);
+    memcpy(black_cp_memory(BLACK_VA(0x2F3C00u)), cp->stats + 4, 16);
+    GUEST32(BLACK_VA(0x2A7EDCu)) = cp->unit;
+    GUEST32(BLACK_VA(0x2EC464u)) = 1;
     GUEST32(c.core + 0x5AF0u) = cp->unit;
     black_cp_memory(c.main)[0x2020Du] = (uint8_t)cp->unit;
     parity = (cp->unit + !(black_cp_memory(c.header)[0x12] & 1u)) % 2u;
@@ -279,7 +279,7 @@ static void black_cp_load(uint32_t core)
     GUEST32(c.core + 0x49D4u + (parity ^ 1u) * 0x880u) =
         cp->unit < black_cp_memory(c.header)[0x11] ? cp->unit + 1u : UINT32_MAX;
     black_cp_memory(c.core)[0x5AEEu] = (uint8_t)(cp->unit < black_cp_memory(c.header)[0x11] ? parity : parity ^ 1u);
-    black_cp_memory(0x2F3BF8u)[0] = 1;
+    black_cp_memory(BLACK_VA(0x2F3BF8u))[0] = 1;
     fprintf(stderr, "[CHECKPOINT] restored level=%u stage=%u difficulty=%u unit=%u\n",
         cp->level, cp->stage, cp->difficulty, cp->unit);
     free(black_cp_cached);
@@ -328,7 +328,7 @@ static void black_cp_profile_saved(uint32_t controller)
     uint32_t manager, profile, slot, payload;
     BlackCheckpoint *cp = black_cp_cached;
     if (!black_pc_ram_span(controller, 0x2A68u)) return;
-    manager = GUEST32(0x2D19B4u);
+    manager = GUEST32(BLACK_VA(0x2D19B4u));
     if (!black_pc_ram_span(manager, 4u)) return;
     profile = GUEST32(manager);
     if (!black_pc_ram_span(profile, 0x6A8u)) return;
@@ -365,7 +365,7 @@ void black_checkpoint_event(uint32_t event, uint32_t core)
         const int valid = black_cp_context(&c, 1);
         fprintf(stderr, "[CHECKPOINT_TRACE] init core=%08X context=%d profile=%08X inventory=%08X objectives=%u backup=%08X live=%u\n",
             core, valid, c.profile, c.inventory, c.objective_count, c.objective_backup,
-            black_cp_memory(0x2F3BF8u)[0]);
+            black_cp_memory(BLACK_VA(0x2F3BF8u))[0]);
     }
     if (event == 1u) black_cp_save();
     else if (event == 2u) black_cp_load(core);

@@ -35,6 +35,13 @@ problems, use **Settings > Diagnostics**. Include the error and your operating
 system when [reporting a problem](https://github.com/portingpete/Black-2006-Recomp/issues).
 See **START HERE.txt** inside the download for the same steps offline.
 
+## PAL disc
+
+This fork also runs the European (PAL) Xbox release. `scripts/black_release.py` maps every hand-written guest address
+to it, and `scripts/verify_release.py` checks them against your `default.xbe`. The PAL disc carries its own English,
+French, German, Italian and Spanish text, chosen from the launcher's menu language; other languages use its English
+text.
+
 ## The launcher
 
 **BLACK Launcher** sets the game up and starts it. It is written in C++ on [Walnut](https://github.com/StudioCherno/Walnut)

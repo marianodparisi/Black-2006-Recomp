@@ -1,6 +1,7 @@
 #include "core/GameBuild.h"
 
 #include "core/ChildProcess.h"
+#include "core/GameFiles.h"
 #include "core/LanguageBanks.h"
 #include "core/Text.h"
 #include "core/TraceLog.h"
@@ -146,6 +147,9 @@ private:
 
 /// The menu text in every language, from the player's retail English bank. A problem here leaves the game built.
 std::string buildLanguages(const ProjectLayout& project, Runner& runner, const fs::path& python) {
+    if (inspectGameFiles(project.defaultXbe()).sha256 == kPalXbeSha256) {
+        return {};  // the PAL disc has its own banks and no MainUS.bin to build from
+    }
     const auto english = preserveEnglishBank(project);
     if (!english) {
         return english.error().message;

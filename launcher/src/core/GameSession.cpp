@@ -251,6 +251,11 @@ struct GameSession::Lock {
     }
 };
 
+/// XC_LANGUAGE for a menu language on the PAL disc, which picks its official bank from it (English otherwise).
+const char* palConsoleLanguage(std::string_view language) {
+    return language == "de" ? "3" : language == "fr" ? "4" : language == "es" ? "5" : language == "it" ? "6" : "1";
+}
+
 std::map<std::string, std::string> gameEnvironment(const ProjectLayout& project, const Settings& settings,
                                                    PathStyle style) {
     std::map<std::string, std::string> env = {
@@ -276,6 +281,9 @@ std::map<std::string, std::string> gameEnvironment(const ProjectLayout& project,
         env["RECOMP_KELVIN_GPU"] = "1";
         env["RECOMP_KGPU_CACHE"] = gamePath(project.localDirectory() / "kgpu-cache", style);  // compiled shaders
         env["RECOMP_KGPU_PRECOMPILE"] = settings.precompileShaders ? "1" : "0";
+    }
+    if (inspectGameFiles(project.defaultXbe()).sha256 == kPalXbeSha256) {
+        env["RECOMP_XBOX_LANGUAGE"] = palConsoleLanguage(settings.menuLanguage);
     }
     if (settings.smooth60 && settings.smoothHz != 0) {
         env["RECOMP_BLACK_HZ"] = std::to_string(settings.smoothHz);
@@ -378,8 +386,11 @@ Result<std::unique_ptr<GameSession>> GameSession::start(const ProjectLayout& pro
     if (!command) {
         return command.error();
     }
-    if (auto bank = installLanguageBank(project, settings.menuLanguage); !bank) {
-        return bank.error();
+    const std::string xbeSha256 = inspectGameFiles(project.defaultXbe()).sha256;
+    if (xbeSha256 != kPalXbeSha256) {
+        if (auto bank = installLanguageBank(project, settings.menuLanguage); !bank) {
+            return bank.error();
+        }
     }
 
     std::error_code error;
@@ -427,7 +438,7 @@ Result<std::unique_ptr<GameSession>> GameSession::start(const ProjectLayout& pro
     launch["executable"] = toUtf8(executable.value());
     launch["exeSha256"] = exeHash ? Sha256::toHex(exeHash.value()) : "";
     launch["workingDirectory"] = toUtf8(project.root());
-    launch["xbeSha256"] = std::string(kSupportedXbeSha256);
+    launch["xbeSha256"] = xbeSha256;
     launch["menuLanguage"] = settings.menuLanguage;
     launch["environment"] = environment;
     launch["visualTraceEnabled"] = settings.visualTraceEnabled;

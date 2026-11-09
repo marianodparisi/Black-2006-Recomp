@@ -87,6 +87,7 @@ TEST_CASE("Optional secondaries validate, round-trip and preserve legacy setting
 
 TEST_CASE("Render size follows the camera aspect, and SSAA doubles it") {
     Settings settings;
+    settings.cameraAspect = "original";
     settings.internalHeight = 720;
     CHECK(renderSize(settings) == std::array{960, 720});
     settings.cameraAspect = "16:9";

@@ -32,7 +32,7 @@ GameFilesStatus releaseOf(std::span<const std::uint8_t> xbe) {
     GameFilesStatus status;
     status.sha256 = Sha256::toHex(hash.finish());
     status.state =
-        status.sha256 == kSupportedXbeSha256 ? GameFilesState::Supported : GameFilesState::UnsupportedVersion;
+        isSupportedXbeSha256(status.sha256) ? GameFilesState::Supported : GameFilesState::UnsupportedVersion;
     return status;
 }
 

@@ -8,6 +8,7 @@
 #include <xmmintrin.h>
 static uint8_t ram[0x800000], before[sizeof(ram)];
 static ptrdiff_t g_xbox_mem_offset;
+#define BLACK_VA(va) (va) /* fixtures use the canonical (NTSC) layout */
 #define GUEST32(a) (*(uint32_t *)(ram + (a)))
 static int black_pc_ram_span(uint32_t address, uint32_t bytes)
 {

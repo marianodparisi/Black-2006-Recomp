@@ -19,7 +19,7 @@ void sub_0014EB10(void)
         ((GUEST32(group + 0x20) == 0x64AE0000u && GUEST32(group + 0x24) == 0x90BC79C1u) ||
          (GUEST32(group + 0x20) == 0x8E6D9000u && GUEST32(group + 0x24) == 0x4F5C5EAFu))) {
         const uint32_t entry = GUEST32(group + 0x40);
-        const uint32_t world = GUEST32(0x002D45F0u);
+        const uint32_t world = GUEST32(BLACK_VA(0x002D45F0u));
         if (black_pc_ram_span(entry, 8) && black_pc_ram_span(world, 0x2020D)) {
             level = GUEST8(world + 0x2020C);
             sector = GUEST32(entry) & 0xFFFFu;

@@ -1,7 +1,7 @@
 [submodule "third_party/xboxrecomp"]
 	path = third_party/xboxrecomp
-	url = https://github.com/portingpete/xboxrecomp.git
-	branch = codex/hold-to-aim
+	url = https://github.com/marianodparisi/xboxrecomp.git
+	branch = pal-support
 [submodule "third_party/dsp56300"]
 	path = third_party/dsp56300
 	url = https://github.com/mborgerson/dsp56300.git

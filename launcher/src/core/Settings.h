@@ -35,15 +35,15 @@ struct Settings {
     bool dspTraceEnabled = false;
 
     // Display (video.ini)
-    int windowWidth = 1280;
-    int windowHeight = 960;
+    int windowWidth = 1600;
+    int windowHeight = 900;
     int internalHeight = 720;
     std::string windowMode = "windowed";
     std::string scaleMode = "fit";
     std::string presentFilter = "linear";
     bool vsync = true;
     int fpsLimit = 0;
-    std::string cameraAspect = "original";
+    std::string cameraAspect = "16:9";
     double verticalFov = 0;  // 0 keeps the game's own camera
     std::string motionBlur = "original";
     std::string actionBlur = "original";  // BLACK's own reload and aim blur

@@ -35,6 +35,7 @@
 #include "pc_menu.h"
 #include "fb_present.h"
 #include "black_menu_prompt_language.h"
+#include "black_release.h"
 #include "black_secondary_objectives.inc"
 
 /* ── ICALL trace ring buffer ───────────────────────────────── */
@@ -177,7 +178,6 @@ static const recomp_func_t g_itrace_wrappers[ITRACE_SLOTS] = {
 extern void sub_0014EB10_gen(void);
 extern void sub_0014EBF0_gen(void);
 extern void sub_00146EA0_gen(void);
-#include "black_speech_subtitles.inc"
 
 extern void sub_000C4570_gen(void);
 
@@ -188,6 +188,7 @@ static void black_movie_skip_font(void);
 
 #define GUEST32(va) (*(uint32_t *)((uintptr_t)g_xbox_mem_offset + (va)))
 #define GUEST8(va) (*(uint8_t *)((uintptr_t)g_xbox_mem_offset + (va)))
+#include "black_speech_subtitles.inc"
 
 /* DirectSound's idle-voice completion edits the same intrusive lists as guest
  * threads at DISPATCH_LEVEL. On Xbox its busy-counter test runs on the same
@@ -254,9 +255,9 @@ static int black_movie_skip_identify(uint32_t movie_va, BlackMovieSkipIdentity *
     const uint8_t *movie;
     const char *stem;
     memset(out, 0, sizeof(*out));
-    if (!black_pc_ram_span(0x002D45F0u, 4u) ||
+    if (!black_pc_ram_span(BLACK_VA(0x002D45F0u), 4u) ||
         !black_pc_ram_span(movie_va, 0x68u)) return 0;
-    main = GUEST32(0x002D45F0u);
+    main = GUEST32(BLACK_VA(0x002D45F0u));
     if (!black_pc_ram_span(main, 0x20428u)) return 0;
     manager = main + 0x2026Cu;
     movie = (const uint8_t *)((uintptr_t)g_xbox_mem_offset + movie_va);
@@ -433,13 +434,13 @@ static int black_hz60_enabled(void)
 
 void sub_00178350(void)
 {
-    if (black_hz60_enabled() && *(volatile uint8_t *)((uintptr_t)g_xbox_mem_offset + 0x002D198Cu) == 0 &&
-        GUEST32(0x002F3A38u) == 0x3D088889u) {
+    if (black_hz60_enabled() && *(volatile uint8_t *)((uintptr_t)g_xbox_mem_offset + BLACK_VA(0x002D198Cu)) == 0 &&
+        GUEST32(BLACK_VA(0x002F3A38u)) == 0x3D088889u) {
         float step = 1.0f / (float)black_hz;
         uint32_t bits;
         memcpy(&bits, &step, sizeof(bits));
         if (black_hz == 60) bits = 0x3C888889u;                /* the value earlier builds wrote */
-        GUEST32(0x002F3A38u) = bits;
+        GUEST32(BLACK_VA(0x002F3A38u)) = bits;
         black_step_halved = 1;
         black_vblank_hz_v = black_hz;
         {
@@ -457,7 +458,7 @@ void sub_00178350(void)
 
 float black_osc_factor(void)
 {
-    uint32_t bits = black_step_halved ? 0x3C23D70Au : GUEST32(0x00295CA8u);   /* 0.01f */
+    uint32_t bits = black_step_halved ? 0x3C23D70Au : GUEST32(BLACK_VA(0x00295CA8u));   /* 0.01f */
     float f;
     memcpy(&f, &bits, sizeof(f));
     if (black_step_halved) f *= 30.0f / (float)black_hz;       /* a power of two: exact */
@@ -698,13 +699,13 @@ static void black_sim_log(void)
     }
     if (!every || ++count % (unsigned)every) return;
     {
-        uint32_t timer = GUEST32(0x002D45D4u), bits, tick = GUEST32(0x002F4368u);
+        uint32_t timer = GUEST32(BLACK_VA(0x002D45D4u)), bits, tick = GUEST32(BLACK_VA(0x002F4368u));
         float seconds, step, dt;
         LARGE_INTEGER now;
         QueryPerformanceCounter(&now);
         if (!timer) return;
         bits = GUEST32(timer + 0x20u); memcpy(&seconds, &bits, 4);
-        bits = GUEST32(0x002F3A38u); memcpy(&step, &bits, 4);
+        bits = GUEST32(BLACK_VA(0x002F3A38u)); memcpy(&step, &bits, 4);
         bits = GUEST32(timer + 0x1Cu); memcpy(&dt, &bits, 4);
         if (t0.QuadPart) {
             double wall = (double)(now.QuadPart - t0.QuadPart) / (double)f.QuadPart;
@@ -737,10 +738,10 @@ void sub_0002BA70(void)
                             "interval TWO -> ONE (simulation timing unverified)\n");
     }
     if (black_60fps || black_hz60_enabled()) {
-        if (GUEST32(0x002B2A08u) == 0x80000002u)
-            GUEST32(0x002B2A08u) = 0x80000001u;
-        if (GUEST32(0x0027C204u) == 0x80000002u)
-            GUEST32(0x0027C204u) = 0x80000001u;
+        if (GUEST32(BLACK_VA(0x002B2A08u)) == 0x80000002u)
+            GUEST32(BLACK_VA(0x002B2A08u)) = 0x80000001u;
+        if (GUEST32(BLACK_VA(0x0027C204u)) == 0x80000002u)
+            GUEST32(BLACK_VA(0x0027C204u)) = 0x80000001u;
     }
     black_sim_log();
     sub_0002BA70_gen();
@@ -821,8 +822,8 @@ void sub_0015A960(void)
 static int black_camera_aspect_begin(uint32_t camera, uint32_t saved[2])
 {
     uint32_t renderer;
-    if (!black_aspect_bits || !black_pc_ram_span(0x002D67F4u, 4u)) return 0;
-    renderer = GUEST32(0x002D67F4u);
+    if (!black_aspect_bits || !black_pc_ram_span(BLACK_VA(0x002D67F4u), 4u)) return 0;
+    renderer = GUEST32(BLACK_VA(0x002D67F4u));
     if (!black_pc_ram_span(renderer, 0xD590u) ||
         (camera != renderer + 0xD450u && camera != renderer + 0xD4F0u)) return 0;
     saved[0] = GUEST32(camera + 0x70u);
@@ -866,8 +867,8 @@ static void black_ao_camera_publish(uint32_t camera)
     uint32_t renderer, hx_bits, hy_bits;
     float hx, hy;
     static int trace = -1, trace_count;
-    if (!black_pc_ram_span(0x002D67F4u, 4u)) return;
-    renderer = GUEST32(0x002D67F4u);
+    if (!black_pc_ram_span(BLACK_VA(0x002D67F4u), 4u)) return;
+    renderer = GUEST32(BLACK_VA(0x002D67F4u));
     if (!black_pc_ram_span(renderer, 0xD4F0u) ||
         camera != renderer + 0xD450u) return;
     hx_bits = GUEST32(camera + 0x48u);
@@ -942,8 +943,8 @@ uint32_t black_viewmodel_draw_begin(uint32_t material_parameters)
     uint32_t renderer;
     black_vm_active = 0u;
     if (!black_vm_owner || material_parameters != black_vm_owner + 0x2C8u ||
-        black_vm_scale_bits == 0x3F800000u || !black_pc_ram_span(0x2D67F4u, 4u)) return previous;
-    renderer = GUEST32(0x2D67F4u);
+        black_vm_scale_bits == 0x3F800000u || !black_pc_ram_span(BLACK_VA(0x2D67F4u), 4u)) return previous;
+    renderer = GUEST32(BLACK_VA(0x2D67F4u));
     if (black_pc_ram_span(renderer, 0xD594u) && GUEST32(renderer + 0xD590u) == renderer + 0xD450u)
         black_vm_active = 1u;
     return previous;
@@ -1001,9 +1002,9 @@ void black_viewmodel_constants(uint32_t upload)
 void black_viewmodel_muzzle_constants(uint32_t upload, uint32_t caller)
 {
     uint32_t player, previous;
-    if (caller != 0x0016B49Eu || !black_vm_owner ||
-        !black_pc_ram_span(0x2D45D4u, 4u)) return;
-    player = GUEST32(0x2D45D4u);
+    if (caller != BLACK_VA(0x0016B49Eu) || !black_vm_owner ||
+        !black_pc_ram_span(BLACK_VA(0x2D45D4u), 4u)) return;
+    player = GUEST32(BLACK_VA(0x2D45D4u));
     if (!black_pc_ram_span(player, 0x4D0u) || player + 0x30u != black_vm_owner) return;
     previous = black_viewmodel_draw_begin(black_vm_owner + 0x2C8u);
     black_viewmodel_constants_kind(upload, 1);
@@ -1037,9 +1038,9 @@ static void black_photo_put(uint32_t va, float v) { memcpy((void *)((uintptr_t)g
 static uint32_t black_photo_world_camera(void)
 {
     uint32_t renderer, owner, camera;
-    if (!black_pc_ram_span(0x002D67F4u, 4u) || !black_pc_ram_span(0x002D12B8u, 4u)) return 0;
-    renderer = GUEST32(0x002D67F4u);
-    owner = GUEST32(0x002D12B8u);
+    if (!black_pc_ram_span(BLACK_VA(0x002D67F4u), 4u) || !black_pc_ram_span(BLACK_VA(0x002D12B8u), 4u)) return 0;
+    renderer = GUEST32(BLACK_VA(0x002D67F4u));
+    owner = GUEST32(BLACK_VA(0x002D12B8u));
     if (!black_pc_ram_span(renderer, 0xD4F0u) || !black_pc_ram_span(owner, 0x16A5u)) return 0;
     camera = renderer + 0xD450u;
     if (GUEST32(camera + 0x68u) != owner + 0x740u ||
@@ -1167,10 +1168,10 @@ void sub_000D2F40(void)
     black_aspect_refresh();
     aspect_adjusted = black_camera_aspect_begin(camera, aspect_saved);
     black_fov_refresh();
-    if (black_fov_vertical && black_pc_ram_span(0x002D67F4u, 4u) &&
-        black_pc_ram_span(0x002D12B8u, 4u)) {
-        const uint32_t renderer = GUEST32(0x002D67F4u);
-        const uint32_t owner = GUEST32(0x002D12B8u);
+    if (black_fov_vertical && black_pc_ram_span(BLACK_VA(0x002D67F4u), 4u) &&
+        black_pc_ram_span(BLACK_VA(0x002D12B8u), 4u)) {
+        const uint32_t renderer = GUEST32(BLACK_VA(0x002D67F4u));
+        const uint32_t owner = GUEST32(BLACK_VA(0x002D12B8u));
         if (black_pc_ram_span(renderer, 0xD4F0u) &&
             camera == renderer + 0xD450u &&
             black_pc_ram_span(owner, 0x16A5u) &&
@@ -1200,8 +1201,8 @@ void sub_000D2F40(void)
     }
     /* Clear the compensation when the primary view returns to its native lens.
      * Secondary/UI camera production cannot replace this world-camera ratio. */
-    if (black_pc_ram_span(0x002D67F4u, 4u)) {
-        const uint32_t renderer = GUEST32(0x002D67F4u);
+    if (black_pc_ram_span(BLACK_VA(0x002D67F4u), 4u)) {
+        const uint32_t renderer = GUEST32(BLACK_VA(0x002D67F4u));
         if (black_pc_ram_span(renderer, 0xD4F0u) && camera == renderer + 0xD450u)
             black_viewmodel_scale(adjusted ? saved_window : 0u, adjusted ? new_window : 0u);
     }
@@ -1364,9 +1365,9 @@ static void black_p2_find_links(void)
  * each player's too. Its cache of decoded keys ([2CE6B0], built by 950F0 from the pool: entries at +C, data at +20,
  * +24 bytes) is keyed by where the animations are, which player two's loads move: it starts empty again on every
  * exchange, as it is when built. */
-#define BLACK_ANIM_CACHE 0x002CE6B0u
-#define BLACK_ANIM_AT 0x002C3260u
-#define BLACK_ANIM_BYTES (0x002CE710u - 0x002C3260u)
+#define BLACK_ANIM_CACHE BLACK_VA(0x002CE6B0u)
+#define BLACK_ANIM_AT BLACK_VA(0x002C3260u)
+#define BLACK_ANIM_BYTES (BLACK_VA(0x002CE710u) - BLACK_VA(0x002C3260u))
 #define BLACK_VM_AT 0x398u
 #define BLACK_VM_BYTES (0x970u - 0x398u)
 #define BLACK_VM_PIECES 32u
@@ -1501,7 +1502,7 @@ static int black_vm_fp_block(uint32_t set, uint32_t i)
 static void black_p2_vm(int start)
 {
     uint8_t *const m = (uint8_t *)(uintptr_t)g_xbox_mem_offset;
-    const uint32_t set = black_pc_ram_span(0x002D12C8u, 4u) ? GUEST32(0x002D12C8u) : 0;
+    const uint32_t set = black_pc_ram_span(BLACK_VA(0x002D12C8u), 4u) ? GUEST32(BLACK_VA(0x002D12C8u)) : 0;
     uint32_t count, bytes, blocks;
     unsigned i;
     if (start) {
@@ -1542,9 +1543,9 @@ static void black_p2_vm(int start)
  * 0x18000 bytes each, the first four the weapons', the one playing +12C0). Player two has a manager of its own,
  * reading into heaps 16 and 18 (which the game leaves unused) on memory of its own, and its own copy of the pool,
  * exchanged in place with the actor, whose four weapon sounds and two banks are built on memory of its own. */
-#define BLACK_BANKS 0x002D12D8u
+#define BLACK_BANKS BLACK_VA(0x002D12D8u)
 #define BLACK_BANKS_BYTES 0xD0u
-#define BLACK_HEAPS 0x002D12ECu
+#define BLACK_HEAPS BLACK_VA(0x002D12ECu)
 #define BLACK_BANK_BYTES 0xE1800u
 #define BLACK_FPV_BYTES 0x1330u
 #define BLACK_FPV_SOUNDS 0x360u
@@ -1562,7 +1563,7 @@ static uint8_t black_p2_fpv[BLACK_FPV_BYTES];
 static uint32_t black_fpv(void)
 {
     uint32_t v;
-    if (!black_pc_ram_span(0x002D0D60u, 4u) || !black_pc_ram_span(v = GUEST32(0x002D0D60u) + 0xD3C8u, 4u) ||
+    if (!black_pc_ram_span(BLACK_VA(0x002D0D60u), 4u) || !black_pc_ram_span(v = GUEST32(BLACK_VA(0x002D0D60u)) + 0xD3C8u, 4u) ||
         !black_pc_ram_span(v = GUEST32(v) + 0xCu, 4u) || !black_pc_ram_span(v = GUEST32(v), BLACK_FPV_BYTES))
         return 0;
     return v;
@@ -1610,14 +1611,14 @@ static void black_p2_banks_take(void)
     for (k = 0; k < 4u; k++) {
         const uint32_t sound = fpv + BLACK_FPV_SOUNDS + k * BLACK_FPV_SOUND_BYTES;
         memset(m + sound, 0, BLACK_FPV_SOUND_BYTES);
-        GUEST32(sound) = 0x002900C4u;
-        GUEST32(sound + 0x170u) = 0x0028C518u;
-        GUEST32(sound + 0x1E8u) = 0x0028C518u;
+        GUEST32(sound) = BLACK_VA(0x002900C4u);
+        GUEST32(sound + 0x170u) = BLACK_VA(0x0028C518u);
+        GUEST32(sound + 0x1E8u) = BLACK_VA(0x0028C518u);
         GUEST32(black_p2_bank_arg + 0xCu) = sounds + k * BLACK_FPV_SOUND_DATA;
         GUEST32(black_p2_bank_arg + 0x10u) = BLACK_FPV_SOUND_DATA;
         memset(&r, 0, sizeof(r));
         r.esi = sound; r.ecx = black_p2_bank_arg;
-        black_guest_call(sub_00141AD0, &r, NULL, 0, 0x0015235Du);
+        black_guest_call(sub_00141AD0, &r, NULL, 0, BLACK_VA(0x0015235Du));
         GUEST8(sound + 0x98u) = held[BLACK_FPV_SOUNDS + k * BLACK_FPV_SOUND_BYTES + 0x98u];
     }
     for (t = 0; t < 2u; t++) {
@@ -1625,7 +1626,7 @@ static void black_p2_banks_take(void)
         memset(m + black_p2_sound_banks[t], 0, 0xC0u);
         memset(&r, 0, sizeof(r));
         r.esi = black_p2_sound_banks[t]; r.edi = banks + t * BLACK_FPV_BANK_DATA; r.ecx = BLACK_FPV_BANK_DATA;
-        black_guest_call(sub_00141380, &r, &name, 1, 0x00152260u);
+        black_guest_call(sub_00141380, &r, &name, 1, BLACK_VA(0x00152260u));
         GUEST32(fpv + t * 0x10u) = black_p2_sound_banks[t];
     }
     memcpy(black_p2_fpv, m + fpv, BLACK_FPV_BYTES);
@@ -1672,7 +1673,7 @@ static void black_p2_banks_swap(void)
 
 static uint32_t black_fx(void)
 {
-    const uint32_t fx = black_pc_ram_span(0x002D1990u, 4u) ? GUEST32(0x002D1990u) + BLACK_FX_AT : 0;
+    const uint32_t fx = black_pc_ram_span(BLACK_VA(0x002D1990u), 4u) ? GUEST32(BLACK_VA(0x002D1990u)) + BLACK_FX_AT : 0;
     if (!fx || !black_pc_ram_span(fx, 0x3460u) || !black_pc_ram_span(GUEST32(fx + 0x3440u), BLACK_FX_SLOTS * 2u) ||
         !black_pc_ram_span(GUEST32(fx + 0x3444u), BLACK_FX_SLOTS * 2u) || GUEST16(fx + 0x344Au) > BLACK_FX_SLOTS ||
         GUEST16(fx + 0x3448u) > GUEST16(fx + 0x344Au) || GUEST16(fx + 0x3458u) > BLACK_FX_ASKED)
@@ -1742,7 +1743,7 @@ static uint8_t black_p2_flash[12];
 
 static uint32_t black_flash(void)
 {
-    const uint32_t f = black_pc_ram_span(0x002D1990u, 4u) ? GUEST32(0x002D1990u) + BLACK_FLASH_AT : 0;
+    const uint32_t f = black_pc_ram_span(BLACK_VA(0x002D1990u), 4u) ? GUEST32(BLACK_VA(0x002D1990u)) + BLACK_FLASH_AT : 0;
     return f && black_pc_ram_span(f, 0xD0u) ? f : 0;
 }
 
@@ -1765,7 +1766,7 @@ static uint8_t black_p2_shells[BLACK_SHELLS_BYTES];
 
 static uint32_t black_shells(void)
 {
-    const uint32_t c = black_pc_ram_span(0x002D1990u, 4u) ? GUEST32(0x002D1990u) + BLACK_SHELLS_AT : 0;
+    const uint32_t c = black_pc_ram_span(BLACK_VA(0x002D1990u), 4u) ? GUEST32(BLACK_VA(0x002D1990u)) + BLACK_SHELLS_AT : 0;
     return c && black_pc_ram_span(c, BLACK_SHELLS_BYTES) ? c : 0;
 }
 
@@ -1784,7 +1785,7 @@ static void black_p2_swap(void)
 {
     uint32_t *const actor = (uint32_t *)((uint8_t *)(uintptr_t)g_xbox_mem_offset + black_p2_core + BLACK_ACTOR_AT);
     uint32_t *const other = (uint32_t *)BLACK_P2_ACTOR;
-    const uint32_t owner = GUEST32(0x002D12B8u);
+    const uint32_t owner = GUEST32(BLACK_VA(0x002D12B8u));
     unsigned i;
     if (!black_p2_in) {
         black_p2_find_links();
@@ -1801,7 +1802,7 @@ static void black_p2_swap(void)
         if (black_p2_link[i]) continue;
         held = actor[i]; actor[i] = other[i]; other[i] = held;
     }
-    GUEST32(0x002D12B8u) = black_p2_owner;
+    GUEST32(BLACK_VA(0x002D12B8u)) = black_p2_owner;
     black_p2_owner = owner;
     black_p2_vm(0);
     black_p2_banks_swap();
@@ -1891,7 +1892,7 @@ void sub_00176BD0(void)
 static void black_p2_start(void)
 {
     uint8_t *const m = (uint8_t *)(uintptr_t)g_xbox_mem_offset;
-    const uint32_t owner1 = GUEST32(0x002D12B8u), delta = black_p2_owner - owner1;
+    const uint32_t owner1 = GUEST32(BLACK_VA(0x002D12B8u)), delta = black_p2_owner - owner1;
     uint32_t *const words = (uint32_t *)BLACK_P2_ACTOR;
     uint32_t off, v;
     memcpy(BLACK_P2_ACTOR, m + black_p2_core + BLACK_ACTOR_AT, BLACK_ACTOR_BYTES);
@@ -1954,7 +1955,7 @@ static int black_p2_make(void)
     memset((uint8_t *)(uintptr_t)g_xbox_mem_offset + black_p2_owner, 0, BLACK_OWNER_BYTES);
     memset(&r, 0, sizeof(r));
     r.esi = black_p2_owner;
-    black_guest_call(sub_00014380, &r, NULL, 0, 0x0020BDD1u);
+    black_guest_call(sub_00014380, &r, NULL, 0, BLACK_VA(0x0020BDD1u));
     return 1;
 }
 
@@ -1992,7 +1993,7 @@ static uint32_t black_puppet_template, black_puppet_names;
 static int black_puppet_moving[2];
 static float black_puppet_was[2][3];
 
-static uint32_t black_char(unsigned i) { return GUEST32(0x002D1980u) + BLACK_CHAR_POOL_AT + i * BLACK_CHAR_BYTES; }
+static uint32_t black_char(unsigned i) { return GUEST32(BLACK_VA(0x002D1980u)) + BLACK_CHAR_POOL_AT + i * BLACK_CHAR_BYTES; }
 
 /* Still a puppet: the soldier's template and no controller (a character the game spawns in its place has one). */
 static int black_puppet_ok(uint32_t ch)
@@ -2030,8 +2031,8 @@ static uint32_t black_puppet_make(uint32_t from, unsigned slot)
     memset(&r, 0, sizeof(r));
     r.eax = ch;
     r.esi = GUEST32(ch + 0x328u);
-    args[0] = GUEST32(0x002D12C8u) + 0xF8u + GUEST32(template_ + 8u) * 0x60u;
-    black_guest_call(sub_0017E420, &r, args, 1, 0x001DA640u);
+    args[0] = GUEST32(BLACK_VA(0x002D12C8u)) + 0xF8u + GUEST32(template_ + 8u) * 0x60u;
+    black_guest_call(sub_0017E420, &r, args, 1, BLACK_VA(0x001DA640u));
     fprintf(stderr, "[SPLIT] character %u is a player's soldier, a copy of %08X\n", slot, from);
     return ch;
 }
@@ -2045,7 +2046,7 @@ static void black_puppets_make(void)
     for (k = 0; k < 2u; k++)
         if (black_puppet[k] && !black_puppet_ok(black_puppet[k])) black_puppet[k] = 0;
     if (black_puppet[0] && black_puppet[1]) return;
-    if (!black_pc_ram_span(GUEST32(0x002D1980u), BLACK_CHAR_POOL_AT + BLACK_CHARS * BLACK_CHAR_BYTES)) return;
+    if (!black_pc_ram_span(GUEST32(BLACK_VA(0x002D1980u)), BLACK_CHAR_POOL_AT + BLACK_CHARS * BLACK_CHAR_BYTES)) return;
     from = black_puppet[0] ? black_puppet[0] : black_puppet[1];
     for (i = 0; i < BLACK_CHARS && !from; i++) {
         const uint32_t ch = black_char(i), t = GUEST32(ch + 0x320u);
@@ -2084,7 +2085,7 @@ static void black_puppet_follow(unsigned who, uint32_t actor, uint32_t dt)
         memset(&r, 0, sizeof(r));
         r.eax = GUEST32(ch + 0x328u);
         args[0] = black_puppet_names + (moving ? 16u : 0u);
-        black_guest_call(sub_0017E130, &r, args, 1, 0x0017F2C3u);
+        black_guest_call(sub_0017E130, &r, args, 1, BLACK_VA(0x0017F2C3u));
         black_puppet_moving[who] = moving;
     }
     /* player one's actor keeps other values in its rows' fourth words: a transform has none */
@@ -2097,7 +2098,7 @@ static void black_puppet_follow(unsigned who, uint32_t actor, uint32_t dt)
     r.eax = GUEST32(ch + 0x328u);
     args[0] = dt;
     args[1] = 0;
-    black_guest_call(sub_001801B0, &r, args, 2, 0x001F0C37u);
+    black_guest_call(sub_001801B0, &r, args, 2, BLACK_VA(0x001F0C37u));
 }
 
 /* With player two out: a physics proxy of its own from the world's character pool (DF400) for the shadow, its body
@@ -2110,9 +2111,9 @@ static void black_p2_take_proxy(int beside_one)
     uint32_t two, k;
     BlackRegs r;
     memset(&r, 0, sizeof(r));
-    r.ebx = GUEST32(0x002D45F4u);
+    r.ebx = GUEST32(BLACK_VA(0x002D45F4u));
     if (!one || !black_pc_ram_span(r.ebx, 0x2980u) || black_proxies_free(r.ebx) < 2u) return;
-    black_guest_call(sub_000DF400, &r, &actor, 1, 0x001EBC8Cu);
+    black_guest_call(sub_000DF400, &r, &actor, 1, BLACK_VA(0x001EBC8Cu));
     black_p2_proxy = GUEST32(actor + 0xB4u);
     if (!(two = black_proxy_motion(black_p2_proxy)) || two == one) {
         fprintf(stderr, "[SPLIT] player two has no physics proxy of its own\n");
@@ -2140,8 +2141,8 @@ static void black_p2_drop_proxy(void)
     BlackRegs r;
     if (!black_p2_proxy) return;
     memset(&r, 0, sizeof(r));
-    r.ebx = GUEST32(0x002D45F4u);
-    black_guest_call(sub_000DBBE0, &r, &black_p2_proxy, 1, 0x001EBBAFu);
+    r.ebx = GUEST32(BLACK_VA(0x002D45F4u));
+    black_guest_call(sub_000DBBE0, &r, &black_p2_proxy, 1, BLACK_VA(0x001EBBAFu));
     black_p2_proxy = 0;
 }
 
@@ -2153,7 +2154,7 @@ static void black_p2_setup(void)
     black_p2_enter();
     memset(&r, 0, sizeof(r));
     r.edx = black_p2_core; r.eax = 0;
-    done = black_guest_call(sub_001E0E40, &r, NULL, 0, 0x001EE605u) & 0xFFu;
+    done = black_guest_call(sub_001E0E40, &r, NULL, 0, BLACK_VA(0x001EE605u)) & 0xFFu;
     black_p2_leave();
     if (done) {
         black_p2_take_proxy(1);
@@ -2185,14 +2186,14 @@ static void black_p2_crosshair(void)
         now = *(const uint16_t *)((uint8_t *)(uintptr_t)g_xbox_mem_offset + GUEST32(weapon + 0xF4u) + 0x18u);
     if (now < loaded) shots += loaded - now;
     loaded = now;
-    pc_crosshair_tick_for(1, !GUEST8(GUEST32(0x002D12B8u) + 0x821u), dt > 0.0f ? sqrtf(step) / dt : 0.0f, shots, zoom);
+    pc_crosshair_tick_for(1, !GUEST8(GUEST32(BLACK_VA(0x002D12B8u)) + 0x821u), dt > 0.0f ? sqrtf(step) / dt : 0.0f, shots, zoom);
 }
 
 /* What the player could use or pick up ([2D0D64]+5848, found by the frame's use query 1EAF40 after the updates and
  * shown by the HUD's prompt): each player's own, put in for its update and its HUD. */
 static uint32_t black_use_at(void)
 {
-    const uint32_t who = black_pc_ram_span(0x002D0D64u, 4u) ? GUEST32(0x002D0D64u) : 0;
+    const uint32_t who = black_pc_ram_span(BLACK_VA(0x002D0D64u), 4u) ? GUEST32(BLACK_VA(0x002D0D64u)) : 0;
     return who && black_pc_ram_span(who + 0x5848u, 4u) ? who + 0x5848u : 0;
 }
 
@@ -2211,7 +2212,7 @@ static void black_use_swap(void)
  * think. It names player two's own. */
 static void black_p2_target(void)
 {
-    const uint32_t ai = black_pc_ram_span(0x002D1988u, 4u) ? GUEST32(0x002D1988u) : 0, index = GUEST32(black_p2_shadow + 0x378u);
+    const uint32_t ai = black_pc_ram_span(BLACK_VA(0x002D1988u), 4u) ? GUEST32(BLACK_VA(0x002D1988u)) : 0, index = GUEST32(black_p2_shadow + 0x378u);
     uint32_t entry;
     if (!ai || index >= 32u || !black_pc_ram_span(ai + 0xFACu, 32u * 12u)) return;
     entry = ai + 0xFACu + index * 12u;
@@ -2223,7 +2224,7 @@ static void black_p2_target(void)
 static void black_p2_update(void)
 {
     const uint32_t actor = black_p2_core + BLACK_ACTOR_AT;
-    const uint32_t pad1 = GUEST32(0x002D45E8u) + 0x98u;
+    const uint32_t pad1 = GUEST32(BLACK_VA(0x002D45E8u)) + 0x98u;
     uint32_t *const words = (uint32_t *)BLACK_P2_ACTOR;
     uint32_t ctl, dt, source1;
     uint8_t idle, packs2;
@@ -2240,7 +2241,7 @@ static void black_p2_update(void)
     }
     GUEST32(black_p2_source + 0xCu) = pad1 + 0x120u;
     /* the camera owner's +821 holds the controller still (cutscenes): player one's says when */
-    GUEST8(black_p2_owner + 0x821u) = GUEST8(GUEST32(0x002D12B8u) + 0x821u);
+    GUEST8(black_p2_owner + 0x821u) = GUEST8(GUEST32(BLACK_VA(0x002D12B8u)) + 0x821u);
     /* what in player two's actor reads player one's pad reads player two's */
     for (k = 0; k < BLACK_ACTOR_BYTES / 4u && source1; k++) {
         if (words[k] == source1) words[k] = black_p2_source;
@@ -2312,7 +2313,7 @@ static void black_p2_update(void)
         memset(&r, 0, sizeof(r));
         r.eax = black_p2_ready_ask;
         r.ecx = GUEST32(actor + 0x328u);
-        black_guest_call(sub_0017F270, &r, NULL, 0, 0x001DEBC9u);
+        black_guest_call(sub_0017F270, &r, NULL, 0, BLACK_VA(0x001DEBC9u));
     }
     /* a scripted scene stops the first-person slot replaying its idle clip (+234, 1FD1F0): player two's as well, or its
      * weapon never sees a clip finish (+B4) and never does what the scene asks */
@@ -2321,30 +2322,30 @@ static void black_p2_update(void)
     if (black_p2_proxy && black_pc_ram_span(ctl, 0xB0u)) {
         GUEST32(ctl + 0xA8u) = source1 ? black_p2_source : 0;
         dt = GUEST32(black_p2_core + 0x1Cu);
-        black_guest_method(ctl, 0, actor, NULL, 0, 0x001F11DAu);
-        black_guest_method(actor, 0, 0, &dt, 1, 0x001F1203u);
+        black_guest_method(ctl, 0, actor, NULL, 0, BLACK_VA(0x001F11DAu));
+        black_guest_method(actor, 0, 0, &dt, 1, BLACK_VA(0x001F1203u));
         /* what 1F1080 does after the world's step for each of the core's entities (+5CB4): vtable +10 (1E5FA0) */
-        black_guest_method(actor, 4, 0, &dt, 1, 0x001F128Bu);
+        black_guest_method(actor, 4, 0, &dt, 1, BLACK_VA(0x001F128Bu));
         /* what the effects' update (1780B0) does after player one's: player two's muzzle flash ages and its shells
          * move, after its own update as player one's do after theirs */
         if (black_flash()) {
             BlackRegs r;
             memset(&r, 0, sizeof(r));
             r.ecx = black_flash();
-            black_guest_call(sub_0015E6C0, &r, NULL, 0, 0x00178101u);
+            black_guest_call(sub_0015E6C0, &r, NULL, 0, BLACK_VA(0x00178101u));
         }
         if (black_shells()) {
             BlackRegs r;
             const uint32_t shells = black_shells();
             memset(&r, 0, sizeof(r));
-            black_guest_call(sub_0016BAA0, &r, &shells, 1, 0x001780F6u);
+            black_guest_call(sub_0016BAA0, &r, &shells, 1, BLACK_VA(0x001780F6u));
         }
         /* and what the frame asks after them (1EAF40): what the player in the core could use or pick up */
         if (black_use_at()) {
             BlackRegs r;
             memset(&r, 0, sizeof(r));
-            r.eax = GUEST32(0x002D0D64u);
-            black_guest_call(sub_001EAF40, &r, NULL, 0, 0x001F12EEu);
+            r.eax = GUEST32(BLACK_VA(0x002D0D64u));
+            black_guest_call(sub_001EAF40, &r, NULL, 0, BLACK_VA(0x001F12EEu));
         }
     }
     black_p2_leave();
@@ -2363,8 +2364,8 @@ static void black_p2_update(void)
 
 static void black_p2_tick(void)
 {
-    if (!pc_split_enabled() || !black_pc_ram_span(0x002D45D4u, 4u) || !black_pc_ram_span(0x002D12B8u, 4u)) return;
-    black_p2_core = GUEST32(0x002D45D4u);
+    if (!pc_split_enabled() || !black_pc_ram_span(BLACK_VA(0x002D45D4u), 4u) || !black_pc_ram_span(BLACK_VA(0x002D12B8u), 4u)) return;
+    black_p2_core = GUEST32(BLACK_VA(0x002D45D4u));
     if (!black_pc_ram_span(black_p2_core, 0x5CC0u)) return;
     if (GUEST32(black_p2_core + 0x5AE0u) != BLACK_CORE_RUNNING) {
         if (black_p2_state) fprintf(stderr, "[SPLIT] player two left: the mission is loading\n");
@@ -2410,9 +2411,9 @@ void sub_001EBB40(void)
         BlackRegs r;
         black_p2_leave();
         memset(&r, 0, sizeof(r));
-        r.ebx = GUEST32(0x002D45F4u);
+        r.ebx = GUEST32(BLACK_VA(0x002D45F4u));
         r.ecx = GUEST32(black_p2_shadow + 0x378u);
-        if (r.ecx) black_guest_call(sub_000DB5B0, &r, &r.ebx, 1, 0x001EBB98u);
+        if (r.ecx) black_guest_call(sub_000DB5B0, &r, &r.ebx, 1, BLACK_VA(0x001EBB98u));
         black_p2_drop_proxy();
     }
     sub_001EBB40_gen();
@@ -2456,8 +2457,8 @@ void sub_000D1500(void)
     sub_000D1500_gen();
     if (black_p2_playing() && grid == black_p2_core + 0x4960u) {
         const uint32_t other = black_puppet[black_p2_in ? 0 : 1];
-        black_guest_method(black_p2_core + BLACK_ACTOR_AT, 5, 0, &partly, 1, 0x001B745Eu);
-        if (black_puppet_ok(other)) black_guest_method(other, 5, 0, &partly, 1, 0x001B745Eu);
+        black_guest_method(black_p2_core + BLACK_ACTOR_AT, 5, 0, &partly, 1, BLACK_VA(0x001B745Eu));
+        if (black_puppet_ok(other)) black_guest_method(other, 5, 0, &partly, 1, BLACK_VA(0x001B745Eu));
     }
 }
 
@@ -2467,14 +2468,14 @@ static void black_p2_camera(uint32_t camera)
 {
     uint32_t sound, listener = 0, saved_listener[0x60 / 4];
     unsigned i;
-    sound = GUEST32(0x002D0D60u);
+    sound = GUEST32(BLACK_VA(0x002D0D60u));
     if (black_pc_ram_span(sound, 0xD384u)) listener = GUEST32(sound + 0xD380u);
     if (listener && !black_pc_ram_span(listener + 0x20u, 0x60u)) listener = 0;
     if (listener) for (i = 0; i < 0x60u / 4u; i++) saved_listener[i] = GUEST32(listener + 0x20u + i * 4u);
     black_p2_enter();
-    GUEST32(camera + 0x68u) = GUEST32(0x002D12B8u) + 0x740u;
+    GUEST32(camera + 0x68u) = GUEST32(BLACK_VA(0x002D12B8u)) + 0x740u;
     black_split_pass = 3;
-    black_guest_method(GUEST32(0x002D12B8u), 2, 0, NULL, 0, 0x0020F842u);
+    black_guest_method(GUEST32(BLACK_VA(0x002D12B8u)), 2, 0, NULL, 0, BLACK_VA(0x0020F842u));
     black_split_pass = 0;
     black_p2_leave();
     if (listener) for (i = 0; i < 0x60u / 4u; i++) GUEST32(listener + 0x20u + i * 4u) = saved_listener[i];
@@ -2489,8 +2490,8 @@ static void black_split_mark(int player, int mode, int slot)
 {
     uint32_t device, physical;
     int r[4];
-    if (!black_pc_ram_span(0x0027BFF8u, 4u)) return;
-    device = GUEST32(0x0027BFF8u);
+    if (!black_pc_ram_span(BLACK_VA(0x0027BFF8u), 4u)) return;
+    device = GUEST32(BLACK_VA(0x0027BFF8u));
     if (!black_pc_ram_span(device, 4u)) return;
     physical = xbox_PhysicalAddressOf(GUEST32(device));
     if (physical >= 0x08000000u) return;
@@ -2511,16 +2512,16 @@ static void black_split_call(void (*fn)(void), uint32_t eax, uint32_t esi, uint3
 static void black_split_clear(void)
 {
     static const uint32_t args[6] = { 0u, 0u, 0xF3u, 0u, 0x3F800000u, 0u };
-    black_split_call(sub_00268880, g_eax, g_esi, g_edi, args, 6, 0x0020BADFu);
+    black_split_call(sub_00268880, g_eax, g_esi, g_edi, args, 6, BLACK_VA(0x0020BADFu));
 }
 
 /* D2F40 for the world camera, called the way 2033A0 calls it; player two's at the native lens (2888C8). */
 static void black_split_produce(uint32_t camera, int pass)
 {
-    const uint32_t owner = GUEST32(0x002D12B8u), lens = GUEST32(owner + 0x750u);
-    if (pass == 2) GUEST32(owner + 0x750u) = GUEST32(0x002888C8u);
+    const uint32_t owner = GUEST32(BLACK_VA(0x002D12B8u)), lens = GUEST32(owner + 0x750u);
+    if (pass == 2) GUEST32(owner + 0x750u) = GUEST32(BLACK_VA(0x002888C8u));
     black_split_pass = pass;
-    black_split_call(sub_000D2F40, g_eax, g_esi, camera, NULL, 0, 0x0020359Fu);
+    black_split_call(sub_000D2F40, g_eax, g_esi, camera, NULL, 0, BLACK_VA(0x0020359Fu));
     black_split_pass = 0;
     GUEST32(owner + 0x750u) = lens;
 }
@@ -2582,10 +2583,10 @@ extern void sub_0012C3A0(void);
  * one's put back as it was. An element's state is taken as reaching the next element in memory (at most its own size).
  * What each player's update put in the elements' sprites is its own; the ammo counter's (its bullets, and the cases
  * thrown out on a shot) are each player's own sprites, and the other player's cases are not shown in its half. */
-#define BLACK_HUD_POOLS_AT 0x002DB790u
-#define BLACK_HUD_POOLS_END 0x002E7100u
-#define BLACK_HUD_AMMO_VTABLE 0x00290F28u
-#define BLACK_HUD_MSG_VTABLE 0x00290F74u
+#define BLACK_HUD_POOLS_AT BLACK_VA(0x002DB790u)
+#define BLACK_HUD_POOLS_END BLACK_VA(0x002E7100u)
+#define BLACK_HUD_AMMO_VTABLE BLACK_VA(0x00290F28u)
+#define BLACK_HUD_MSG_VTABLE BLACK_VA(0x00290F74u)
 #define BLACK_HUD_SPRITES 64u
 #define BLACK_HUD_ELEMENTS 128u
 #define BLACK_HUD_ELEMENT_BYTES 0xC00u
@@ -2605,14 +2606,14 @@ static int black_hud_order(const void *a, const void *b)
 static uint32_t black_hud_size(uint32_t vt)
 {
     switch (vt) {
-    case 0x00290F90u: return 0xC0u;
-    case 0x00290FC4u: return 0xBC0u;
-    case 0x00290FB8u: return 0x240u;
-    case 0x00290F84u: return 0x30u;
-    case 0x00290FACu: return 0xB0u;
-    case 0x00290F28u: return 0x210u;
-    case 0x00290F9Cu: case 0x00290F64u: return 0x30u;
-    case 0x00290EECu: return 0x170u;
+    case BLACK_VA(0x00290F90u): return 0xC0u;
+    case BLACK_VA(0x00290FC4u): return 0xBC0u;
+    case BLACK_VA(0x00290FB8u): return 0x240u;
+    case BLACK_VA(0x00290F84u): return 0x30u;
+    case BLACK_VA(0x00290FACu): return 0xB0u;
+    case BLACK_VA(0x00290F28u): return 0x210u;
+    case BLACK_VA(0x00290F9Cu): case BLACK_VA(0x00290F64u): return 0x30u;
+    case BLACK_VA(0x00290EECu): return 0x170u;
     default: return 0x400u;
     }
 }
@@ -2620,7 +2621,7 @@ static uint32_t black_hud_size(uint32_t vt)
 /* The elements in memory order, each with the bytes up to the next; nonzero when they are the ones last seen. */
 static int black_hud_elements(void)
 {
-    const uint32_t hud = GUEST32(0x002D12E4u);
+    const uint32_t hud = GUEST32(BLACK_VA(0x002D12E4u));
     uint32_t at[BLACK_HUD_ELEMENTS], layer, e;
     unsigned n = 0, i, layers;
     int same;
@@ -2650,8 +2651,8 @@ static int black_hud_elements(void)
 static int black_hud_mine(uint32_t vt)
 {
     switch (vt) {
-    case 0x00290F90u: case 0x00290FC4u: case 0x00290FB8u: case 0x00290F84u: case 0x00290FACu: case 0x00290F28u:
-    case 0x00290F9Cu: case 0x00290F64u: case 0x00290EECu:
+    case BLACK_VA(0x00290F90u): case BLACK_VA(0x00290FC4u): case BLACK_VA(0x00290FB8u): case BLACK_VA(0x00290F84u): case BLACK_VA(0x00290FACu): case BLACK_VA(0x00290F28u):
+    case BLACK_VA(0x00290F9Cu): case BLACK_VA(0x00290F64u): case BLACK_VA(0x00290EECu):
         return 1;
     default:
         return 0;
@@ -2744,20 +2745,20 @@ extern void sub_000E87B0(void);
 extern void sub_00101260(void);
 static void black_hud_packs(int count)
 {
-    const uint32_t movie = GUEST32(0x002D199Cu);
+    const uint32_t movie = GUEST32(BLACK_VA(0x002D199Cu));
     uint32_t args[4];
     BlackRegs r;
     if (!black_pc_ram_span(movie, 0x3960u)) return;
     memset(&r, 0, sizeof(r));
     r.edi = (uint32_t)count;
-    args[3] = black_guest_call(sub_000E87B0, &r, NULL, 0, 0x001EA6EAu);
+    args[3] = black_guest_call(sub_000E87B0, &r, NULL, 0, BLACK_VA(0x001EA6EAu));
     if (!args[3]) return;
-    args[0] = 0x0028F274u;
+    args[0] = BLACK_VA(0x0028F274u);
     args[1] = 0;
     args[2] = 1;
     memset(&r, 0, sizeof(r));
     r.eax = movie + 0x38C9u;
-    black_guest_call(sub_00101260, &r, args, 4, 0x001EA6FBu);
+    black_guest_call(sub_00101260, &r, args, 4, BLACK_VA(0x001EA6FBu));
 }
 
 /* The messages element (vtable 290F74, 0x2B20 bytes, 1314E0) shows what the player could use (+1C..+27, its texts
@@ -2823,9 +2824,9 @@ static void black_msg_take(uint32_t msg)
 static void black_hud_update(void)
 {
     uint32_t args[2];
-    args[0] = GUEST32(0x002D12E4u);
+    args[0] = GUEST32(BLACK_VA(0x002D12E4u));
     args[1] = 0;
-    black_split_call(sub_0012C3A0, g_eax, g_esi, g_edi, args, 2, 0x001F12FEu);
+    black_split_call(sub_0012C3A0, g_eax, g_esi, g_edi, args, 2, BLACK_VA(0x001F12FEu));
 }
 
 void sub_00129340(void)
@@ -2875,21 +2876,21 @@ void sub_00129340(void)
             for (k = 0; k < black_hud_count; k++) {
                 uint32_t dt = GUEST32(black_p2_core + 0x1Cu);
                 if (black_hud_bytes[k] >= 4u && black_hud_mine(GUEST32(black_hud_at[k])))
-                    black_guest_method(black_hud_at[k], 1, 0, &dt, 1, 0x0012C3CEu);
+                    black_guest_method(black_hud_at[k], 1, 0, &dt, 1, BLACK_VA(0x0012C3CEu));
             }
             if (msg && black_msg_in) {
                 uint32_t dt = GUEST32(black_p2_core + 0x1Cu);
-                black_guest_method(msg, 1, 0, &dt, 1, 0x0012C3CEu);
+                black_guest_method(msg, 1, 0, &dt, 1, BLACK_VA(0x0012C3CEu));
             }
         } else {
             black_use_swap();
             black_p2_enter();
         }
     }
-    black_split_call(sub_0013C050, g_eax, GUEST32(0x002D12E4u), g_edi, &below, 1, 0x0020BB04u);
-    black_split_call(sub_00121E60, g_eax, g_esi, GUEST32(0x002D199Cu), NULL, 0, 0x0020BB0Fu);
-    black_split_call(sub_0013C050, g_eax, GUEST32(0x002D12E4u), g_edi, &above, 1, 0x0020BB1Cu);
-    black_split_call(sub_00129340_gen, GUEST32(0x002D19A4u), g_esi, g_edi, NULL, 0, 0x0020BB26u);
+    black_split_call(sub_0013C050, g_eax, GUEST32(BLACK_VA(0x002D12E4u)), g_edi, &below, 1, BLACK_VA(0x0020BB04u));
+    black_split_call(sub_00121E60, g_eax, g_esi, GUEST32(BLACK_VA(0x002D199Cu)), NULL, 0, BLACK_VA(0x0020BB0Fu));
+    black_split_call(sub_0013C050, g_eax, GUEST32(BLACK_VA(0x002D12E4u)), g_edi, &above, 1, BLACK_VA(0x0020BB1Cu));
+    black_split_call(sub_00129340_gen, GUEST32(BLACK_VA(0x002D19A4u)), g_esi, g_edi, NULL, 0, BLACK_VA(0x0020BB26u));
     if (black_p2_playing()) {
         black_p2_leave();
         black_use_swap();
@@ -2940,7 +2941,7 @@ void black_weapon_trace(uint32_t stage, uint32_t object)
     }
     if (!enabled) goto done;
     ++records;
-    if (black_pc_ram_span(0x002D0D64u, 4u)) manager = GUEST32(0x002D0D64u);
+    if (black_pc_ram_span(BLACK_VA(0x002D0D64u), 4u)) manager = GUEST32(BLACK_VA(0x002D0D64u));
     fprintf(stderr, "[WEAPON] n=%u stage=%u object=%08X", records, stage, object);
     if ((stage == 1u || stage == 2u) && black_pc_ram_span(object, 0x3B0u)) {
         uint32_t weapon = GUEST32(object + 0x29Cu), slots = GUEST32(object + 0x258u);
@@ -3161,12 +3162,12 @@ static int black_test_weapon_loadout_valid(uint32_t record)
 {
     const uint8_t *memory = (const uint8_t *)(uintptr_t)g_xbox_mem_offset;
     uint32_t core, inventory, header, entries, count, i, matches = 0;
-    if (!black_pc_ram_span(0x2D45D4u, 4u) || !black_pc_ram_span(0x2D12D0u, 4u)) return 0;
-    core = GUEST32(0x2D45D4u);
+    if (!black_pc_ram_span(BLACK_VA(0x2D45D4u), 4u) || !black_pc_ram_span(BLACK_VA(0x2D12D0u), 4u)) return 0;
+    core = GUEST32(BLACK_VA(0x2D45D4u));
     if (!black_pc_ram_span(core, 0x5CB2u) || record != core + 0x3F0u ||
         !black_pc_ram_span(record, 0x50u) || memory[core + 0x5CB1u] ||
         (memory[core + 0x5AECu] != 5u && memory[core + 0x5AECu] != 6u)) return 0;
-    inventory = GUEST32(0x2D12D0u);
+    inventory = GUEST32(BLACK_VA(0x2D12D0u));
     if (!black_pc_ram_span(inventory, 4u)) return 0;
     header = GUEST32(inventory);
     if (!black_pc_ram_span(header, 8u)) return 0;
@@ -3227,7 +3228,7 @@ static int black_test_stream_unit_valid(uint32_t core, unsigned unit)
     const uint8_t *memory = (const uint8_t *)(uintptr_t)g_xbox_mem_offset;
     uint32_t header;
     unsigned count;
-    if (!black_pc_ram_span(0x2D45D4u, 4u) || core != GUEST32(0x2D45D4u) ||
+    if (!black_pc_ram_span(BLACK_VA(0x2D45D4u), 4u) || core != GUEST32(BLACK_VA(0x2D45D4u)) ||
         !black_pc_ram_span(core, 0x5AF8u) ||
         (memory[core + 0x5AECu] != 5u && memory[core + 0x5AECu] != 6u) ||
         memory[core + 0x5AEDu] != 1u) return 0;
@@ -3397,7 +3398,7 @@ void sub_00115B40(void)
     black_aspect_refresh();
     _mm_setcsr(caller_csr);
     const uint32_t scale_bits = black_hud_scale_bits();
-    const uint32_t renderer = scale_bits ? GUEST32(0x2D67F4u) : 0u;
+    const uint32_t renderer = scale_bits ? GUEST32(BLACK_VA(0x2D67F4u)) : 0u;
     const uint32_t stack_begin = stack >= 0x10040u ?
         ((stack - 4u) & ~15u) - 0x20u : 0u;
     const uint32_t stack_bytes = stack_begin ? stack + 4u - stack_begin : 0u;
@@ -3408,14 +3409,14 @@ void sub_00115B40(void)
         black_hud_disjoint(ui, 0x37A0u, stack_begin, stack_bytes) &&
         black_hud_disjoint(ui, 0x37A0u, renderer + 0xD428u, 8u) &&
         black_hud_disjoint(ui, 0x37A0u, renderer + 0xCu, 1u) &&
-        black_hud_disjoint(ui, 0x37A0u, 0x5629A4u, 4u) &&
-        black_hud_disjoint(ui, 0x37A0u, 0x2D67F4u, 4u) &&
+        black_hud_disjoint(ui, 0x37A0u, BLACK_VA(0x5629A4u), 4u) &&
+        black_hud_disjoint(ui, 0x37A0u, BLACK_VA(0x2D67F4u), 4u) &&
         black_hud_disjoint(stack_begin, stack_bytes, renderer + 0xD428u, 8u) &&
-        black_hud_disjoint(stack_begin, stack_bytes, 0x5629A4u, 4u) &&
+        black_hud_disjoint(stack_begin, stack_bytes, BLACK_VA(0x5629A4u), 4u) &&
         black_hud_disjoint(stack_begin, stack_bytes, renderer + 0xCu, 1u) &&
-        black_hud_disjoint(stack_begin, stack_bytes, 0x2D67F4u, 4u);
+        black_hud_disjoint(stack_begin, stack_bytes, BLACK_VA(0x2D67F4u), 4u);
     const uint32_t width = adjust ? GUEST32(renderer + 0xD428u) : 0u;
-    const uint32_t virtual_width = adjust ? GUEST32(0x5629A4u) : 0u;
+    const uint32_t virtual_width = adjust ? GUEST32(BLACK_VA(0x5629A4u)) : 0u;
     sub_00115B40_gen();
     if (adjust) {
         const unsigned int original_csr = _mm_getcsr();
@@ -3438,8 +3439,8 @@ void sub_00113E70(void)
     black_aspect_refresh();
     _mm_setcsr(caller_csr);
     const uint32_t scale_bits = black_hud_scale_bits();
-    const uint32_t renderer = scale_bits ? GUEST32(0x2D67F4u) : 0u;
-    const uint32_t ui = scale_bits ? GUEST32(0x2D199Cu) : 0u;
+    const uint32_t renderer = scale_bits ? GUEST32(BLACK_VA(0x2D67F4u)) : 0u;
+    const uint32_t ui = scale_bits ? GUEST32(BLACK_VA(0x2D199Cu)) : 0u;
     const uint32_t input = scale_bits && black_hud_span(stack, 8u) ?
         GUEST32(stack + 4u) : 0u;
     const int adjust = scale_bits && black_hud_span(ui, 0x37A0u) &&
@@ -3450,8 +3451,8 @@ void sub_00113E70(void)
         black_hud_disjoint(input, 24u, stack - 4u, 12u) &&
         black_hud_disjoint(ui + 0x3740u, 24u, stack - 4u, 12u) &&
         black_hud_disjoint(ui + 0x3740u, 24u, renderer + 0xCu, 1u) &&
-        black_hud_disjoint(ui + 0x3740u, 24u, 0x2D67F4u, 4u) &&
-        black_hud_disjoint(ui + 0x3740u, 24u, 0x2D199Cu, 4u) &&
+        black_hud_disjoint(ui + 0x3740u, 24u, BLACK_VA(0x2D67F4u), 4u) &&
+        black_hud_disjoint(ui + 0x3740u, 24u, BLACK_VA(0x2D199Cu), 4u) &&
         black_hud_disjoint(stack - 4u, 12u, renderer + 0xCu, 1u);
     const uint32_t input_x = adjust ? GUEST32(input + 0x10u) : 0u;
     sub_00113E70_gen();
@@ -3579,7 +3580,7 @@ static uint32_t black_scope_trace_tall_keys[64][8];
  * None of these looser diagnostic gates authorize a mask write. */
 static void black_scope_mask_trace_entry(uint32_t stack)
 {
-    uint32_t ui = black_scope_trace_word(0x2D199Cu, 0u), slots[105], key[8];
+    uint32_t ui = black_scope_trace_word(BLACK_VA(0x2D199Cu), 0u), slots[105], key[8];
     unsigned i, j, changed, first, tall = 0u, csr;
     fenv_t environment;
     first = black_scope_trace_entries < 4u;
@@ -3620,8 +3621,8 @@ static void black_scope_mask_trace_entry(uint32_t stack)
     fprintf(stderr, "[BLACK_SCOPE_ENTRY] entry=%u slotRecords=%u tallRecords=%u first=%u changed=%u tall=%u stack=%08X stackValid=%u ret=%08X shape=%08X mode=%08X ui=%08X uiValid=%u renderer=%08X chart=%08X,%08X affine=%08X,%08X,%08X,%08X,%08X,%08X\n",
         black_scope_trace_entries, black_scope_trace_slot_records, black_scope_trace_tall_records,
         first, changed, tall, stack, black_hud_span(stack, 12u), black_scope_trace_word(stack, 0u),
-        key[0], key[1], ui, black_hud_span(ui, 0x37A0u), black_scope_trace_word(0x2D67F4u, 0u),
-        black_scope_trace_word(0x5629A4u, 0u), black_scope_trace_word(0x5629C8u, 0u),
+        key[0], key[1], ui, black_hud_span(ui, 0x37A0u), black_scope_trace_word(BLACK_VA(0x2D67F4u), 0u),
+        black_scope_trace_word(BLACK_VA(0x5629A4u), 0u), black_scope_trace_word(BLACK_VA(0x5629C8u), 0u),
         key[2], key[3], key[4], key[5], key[6], key[7]);
     if (changed) for (i = 0u; i < 13u; ++i) {
         const uint32_t entry = slots[6u + i * 8u], name = slots[7u + i * 8u];
@@ -3656,7 +3657,7 @@ static void black_scope_mask_trace(uint32_t stack)
     black_scope_mask_trace_entry(stack);
     if (black_scope_trace_records == 48u ||
         !black_hud_span(stack, 12u)) return;
-    ui = black_scope_trace_word(0x2D199Cu, 0u);
+    ui = black_scope_trace_word(BLACK_VA(0x2D199Cu), 0u);
     if (!black_hud_span(ui, 0x37A0u)) return;
     for (slot = 0u; slot < 13u; ++slot) {
         uint32_t count, name, n;
@@ -3691,13 +3692,13 @@ static void black_scope_mask_trace(uint32_t stack)
          (m[3] & 0x7FFFFFFFu) > 0x43800000u)) return;
     key[0] = resource; key[1] = leaf; key[2] = shape; key[3] = mode;
     memcpy(key + 4u, m, sizeof(m));
-    key[10] = black_scope_trace_word(0x5629A4u, 0u);
-    key[11] = black_scope_trace_word(0x5629C8u, 0u);
+    key[10] = black_scope_trace_word(BLACK_VA(0x5629A4u), 0u);
+    key[11] = black_scope_trace_word(BLACK_VA(0x5629C8u), 0u);
     for (i = 0u; i < black_scope_trace_records; ++i)
         if (!memcmp(key, black_scope_trace_keys[i], sizeof(key))) return;
     memcpy(black_scope_trace_keys[black_scope_trace_records], key, sizeof(key));
     ++black_scope_trace_records;
-    renderer = black_scope_trace_word(0x2D67F4u, 0u);
+    renderer = black_scope_trace_word(BLACK_VA(0x2D67F4u), 0u);
     pack = black_scope_trace_word(block, 0x18u);
     geometries = black_scope_trace_word(pack, 12u);
     subshape = black_scope_trace_word(shape, 0u);
@@ -3761,13 +3762,13 @@ static int black_scope_mask_begin(uint32_t stack, uint32_t *ui_out, uint32_t sav
     __m128 shifted_left, shifted_right, edge, width, sx;
     if (!scale || stack < 0x10020u || !black_hud_span(stack - 0x20u, 0x2Cu) ||
         GUEST32(stack + 8u)) return 0; /* Ordinary leaf draw, never a stencil pass. */
-    ui = GUEST32(0x2D199Cu);
-    renderer = GUEST32(0x2D67F4u);
+    ui = GUEST32(BLACK_VA(0x2D199Cu));
+    renderer = GUEST32(BLACK_VA(0x2D67F4u));
     shape = GUEST32(stack + 4u);
     if (!black_hud_span(ui, 0x37A0u) || !black_hud_span(renderer, 0xD430u) ||
         !*(const unsigned char *)((uintptr_t)g_xbox_mem_offset + renderer + 0xCu) ||
         !black_hud_disjoint(ui + 0x3740u, 24u, stack - 0x20u, 0x2Cu) ||
-        GUEST32(0x5629A4u) != 0x44200000u || GUEST32(0x5629C8u) != 0x43F00000u ||
+        GUEST32(BLACK_VA(0x5629A4u)) != 0x44200000u || GUEST32(BLACK_VA(0x5629C8u)) != 0x43F00000u ||
         GUEST32(ui + 0x3740u) != 0x41DBFFF0u || GUEST32(ui + 0x3744u) ||
         GUEST32(ui + 0x3748u) || GUEST32(ui + 0x374Cu) != 0x427A0090u ||
         GUEST32(ui + 0x3754u) != 0xC1200000u || !black_scope_owned(ui, shape)) return 0;
@@ -3873,8 +3874,8 @@ recomp_func_t recomp_lookup_manual(uint32_t xbox_va)
             return g_itrace_wrappers[i];
     /* This XBE thunk shares the implementation of the discovered 0x0020B3B0
      * async worker thunk. Keep the missing-file recovery callback resolvable. */
-    if (xbox_va == 0x0020B6D0u)
-        return recomp_lookup(0x0020B3B0u);
+    if (xbox_va == BLACK_VA(0x0020B6D0u))
+        return recomp_lookup(BLACK_VA(0x0020B3B0u));
     return (recomp_func_t)0;
 }
 
@@ -4067,7 +4068,7 @@ static RECOMP_TLS uint32_t black_movie_frame_crop;
 
 static uint32_t black_movie_frame_capable(void)
 {
-    uint32_t device=GUEST32(0x27BFF8u);
+    uint32_t device=GUEST32(BLACK_VA(0x27BFF8u));
     if (!kelvin_active() || !black_pc_ram_span(device,0x2480u) ||
         (GUEST32(device+8u)&0x4000u)) return 0;
     return device;
@@ -4082,7 +4083,7 @@ void black_movie_tag_flip(uint32_t parameter_va)
     uint32_t device=black_movie_frame_device, crop=black_movie_frame_crop, physical;
     black_movie_frame_device=0;
     black_movie_frame_crop=0;
-    if (device && device==GUEST32(0x27BFF8u) &&
+    if (device && device==GUEST32(BLACK_VA(0x27BFF8u)) &&
         black_pc_ram_span(parameter_va,4u)) {
         physical=xbox_PhysicalAddressOf(parameter_va);
         if (physical<0x08000000u)
@@ -4129,7 +4130,7 @@ static int black_movie_prepare(uint32_t aspect, BlackMovieRect *result)
      * origin=S+58, LTRB=S+60, pixel-UV=S+70, color=S+80, S=callee entry ESP.
      * Fixing only this call cannot affect DA540's movie widgets. */
     if (stack < 0x10100u || !black_movie_span(stack-0x100u,0x190u) ||
-        GUEST32(stack) != 0x00121AB4u || GUEST32(stack+8u) != 1u ||
+        GUEST32(stack) != BLACK_VA(0x00121AB4u) || GUEST32(stack+8u) != 1u ||
         rect != stack+0x60u || GUEST32(stack+4u) != stack+0x58u ||
         GUEST32(stack+12u) != stack+0x70u || g_ecx != stack+0x80u)
         return 0;
@@ -4139,11 +4140,11 @@ static int black_movie_prepare(uint32_t aspect, BlackMovieRect *result)
         GUEST32(stack+0x70u) != 0u || GUEST32(stack+0x74u) != 0u ||
         GUEST32(stack+0x78u) != 0x44200000u ||
         GUEST32(stack+0x7Cu) != 0x43F00000u ||
-        GUEST32(0x2F3710u) != 0u || GUEST32(0x2F36D4u) == 2u)
+        GUEST32(BLACK_VA(0x2F3710u)) != 0u || GUEST32(BLACK_VA(0x2F36D4u)) == 2u)
         return 0;
 
-    main_object=GUEST32(0x2D45F0u); ui=GUEST32(0x2D199Cu);
-    renderer=GUEST32(0x2D67F4u);
+    main_object=GUEST32(BLACK_VA(0x2D45F0u)); ui=GUEST32(BLACK_VA(0x2D199Cu));
+    renderer=GUEST32(BLACK_VA(0x2D67F4u));
     if (!black_movie_span(main_object,0x20408u) ||
         !black_movie_span(ui,0x391Cu) ||
         !black_movie_span(renderer,0xD430u)) return 0;
@@ -4161,7 +4162,7 @@ static int black_movie_prepare(uint32_t aspect, BlackMovieRect *result)
      * actually allocated at D36CB, so this policy supports exactly 0/1. */
     if (frame > 1u) return 0;
     buffer=movie+frame*0x20u;
-    if (g_edi != buffer || GUEST32(0x56EF30u) != buffer ||
+    if (g_edi != buffer || GUEST32(BLACK_VA(0x56EF30u)) != buffer ||
         GUEST32(buffer+0x18u) != 640u ||
         GUEST32(buffer+0x1Cu) != 480u) return 0;
     texture=GUEST32(buffer+0x14u);
@@ -4173,16 +4174,16 @@ static int black_movie_prepare(uint32_t aspect, BlackMovieRect *result)
     reads[2].address=renderer; reads[2].bytes=0xD430u;
     reads[3].address=movie; reads[3].bytes=0x68u;
     reads[4].address=texture; reads[4].bytes=0x18u;
-    reads[5].address=0x2D199Cu; reads[5].bytes=4u;
-    reads[6].address=0x2D45F0u; reads[6].bytes=4u;
-    reads[7].address=0x2D67F4u; reads[7].bytes=4u;
-    reads[8].address=0x2F3640u; reads[8].bytes=0xE4u;
-    reads[9].address=0x56E600u; reads[9].bytes=0x2000u;
-    reads[10].address=0x563120u; reads[10].bytes=0x1800u;
-    reads[11].address=0x27CE88u; reads[11].bytes=32u;
-    reads[12].address=0x279B58u; reads[12].bytes=1u;
-    reads[13].address=0x28B470u; reads[13].bytes=24u;
-    reads[14].address=0x295CB4u; reads[14].bytes=4u;
+    reads[5].address=BLACK_VA(0x2D199Cu); reads[5].bytes=4u;
+    reads[6].address=BLACK_VA(0x2D45F0u); reads[6].bytes=4u;
+    reads[7].address=BLACK_VA(0x2D67F4u); reads[7].bytes=4u;
+    reads[8].address=BLACK_VA(0x2F3640u); reads[8].bytes=0xE4u;
+    reads[9].address=BLACK_VA(0x56E600u); reads[9].bytes=0x2000u;
+    reads[10].address=BLACK_VA(0x563120u); reads[10].bytes=0x1800u;
+    reads[11].address=BLACK_VA(0x27CE88u); reads[11].bytes=32u;
+    reads[12].address=BLACK_VA(0x279B58u); reads[12].bytes=1u;
+    reads[13].address=BLACK_VA(0x28B470u); reads[13].bytes=24u;
+    reads[14].address=BLACK_VA(0x295CB4u); reads[14].bytes=4u;
     for (i=0;i<15u;i++)
         if (!black_movie_disjoint(stack-0x100u,0x190u,
                                   reads[i].address,reads[i].bytes)) return 0;
@@ -4256,11 +4257,11 @@ static uint32_t black_direct_scale_bits(void)
     unsigned native;
     if(black_aspect_bits!=0x3FE38E39u && black_aspect_bits!=0x40155555u &&
        black_aspect_bits!=0x40638E39u)return 0;
-    if(!black_pc_ram_span(0x2F4348u,1u))return 0;
-    native=*(const unsigned char *)((uintptr_t)g_xbox_mem_offset+0x2F4348u);
+    if(!black_pc_ram_span(BLACK_VA(0x2F4348u),1u))return 0;
+    native=*(const unsigned char *)((uintptr_t)g_xbox_mem_offset+BLACK_VA(0x2F4348u));
     if(native){
-        if(!black_pc_ram_span(0x2AF460u,8u) || GUEST32(0x2AF460u)!=0x3F800000u ||
-           GUEST32(0x2AF464u)!=0x3FAAAAABu)return 0;
+        if(!black_pc_ram_span(BLACK_VA(0x2AF460u),8u) || GUEST32(BLACK_VA(0x2AF460u))!=0x3F800000u ||
+           GUEST32(BLACK_VA(0x2AF464u))!=0x3FAAAAABu)return 0;
         return black_aspect_bits==0x40155555u ? 0x3F430C31u :
                black_aspect_bits==0x40638E39u ? 0x3F000000u : 0u;
     }
@@ -4348,7 +4349,7 @@ static int black_direct_records(uint32_t slots,uint32_t n,uint32_t root,uint32_t
                 object=GUEST32(node+0x2Cu);
                 if(!black_direct_input(root,object,0x10u) ||
                    !black_direct_font(root,GUEST32(object+8u),GUEST32(node+0x28u)))return 0;
-             }else if(callback==0xD8B80u || callback==0x135370u || callback==0x1355B0u){
+             }else if(callback==0xD8B80u || callback==BLACK_VA(0x135370u) || callback==BLACK_VA(0x1355B0u)){
                 if(!black_direct_font(root,GUEST32(node+0x28u),GUEST32(node+0x2Cu)))return 0;
              }}
             node=GUEST32(node);
@@ -4361,9 +4362,9 @@ static uint32_t black_direct_root(uint32_t context,uint32_t stack)
 {
     uint32_t hud,renderer,root,slots,n,start,count,other,stack_begin,device,write,end,i,banks;
     unsigned left=512u;
-    if(!black_pc_ram_span(stack,8u) || GUEST32(stack)!=0x13C02Fu)return 0;
-    if(!black_pc_ram_span(0x2D12E4u,4u) || !black_pc_ram_span(0x2D67F4u,4u))return 0;
-    hud=GUEST32(0x2D12E4u);renderer=GUEST32(0x2D67F4u);
+    if(!black_pc_ram_span(stack,8u) || GUEST32(stack)!=BLACK_VA(0x13C02Fu))return 0;
+    if(!black_pc_ram_span(BLACK_VA(0x2D12E4u),4u) || !black_pc_ram_span(BLACK_VA(0x2D67F4u),4u))return 0;
+    hud=GUEST32(BLACK_VA(0x2D12E4u));renderer=GUEST32(BLACK_VA(0x2D67F4u));
     if(!black_pc_ram_span(hud,0x240u) || !black_pc_ram_span(renderer,0xD568u) ||
        !*(const unsigned char *)((uintptr_t)g_xbox_mem_offset+renderer+0xCu) ||
        (context!=hud+0x40u && context!=hud+0xE8u))return 0;
@@ -4382,25 +4383,25 @@ static uint32_t black_direct_root(uint32_t context,uint32_t stack)
        !black_direct_disjoint(hud,0x240u,stack_begin,0x10008u) ||
        !black_direct_disjoint(renderer,0xD568u,stack_begin,0x10008u) ||
        !black_direct_disjoint(slots,n*16u,stack_begin,0x10008u) ||
-       !black_direct_disjoint(0x2D12E4u,4u,stack_begin,0x10008u) ||
-       !black_direct_disjoint(0x2D67F4u,4u,stack_begin,0x10008u) ||
+       !black_direct_disjoint(BLACK_VA(0x2D12E4u),4u,stack_begin,0x10008u) ||
+       !black_direct_disjoint(BLACK_VA(0x2D67F4u),4u,stack_begin,0x10008u) ||
        !black_direct_disjoint(root,0x50u,hud,0x240u) ||
        !black_direct_disjoint(root,0x50u,renderer,0xD568u) ||
        !black_direct_disjoint(root,0x50u,slots,n*16u) ||
        (other && !black_direct_disjoint(root,0x50u,other,0x50u)) ||
-       !black_direct_disjoint(root,0x50u,0x2D12E4u,4u) ||
-       !black_direct_disjoint(root,0x50u,0x2D67F4u,4u) ||
-       !black_direct_disjoint(root,0x50u,0x2F4348u,1u) ||
-       !black_direct_disjoint(root,0x50u,0x2AF460u,8u) ||
-       !black_direct_disjoint(root,0x50u,0x295C00u,0x1000u) ||
-       !black_direct_disjoint(root,0x50u,0x2EDB00u,0x3000u) ||
-       !black_direct_disjoint(root,0x50u,0x2F3600u,0xE00u) ||
-       !black_direct_disjoint(root,0x50u,0x2F4518u,0x20u) ||
-       !black_direct_disjoint(root,0x50u,0x563120u,0x1810u) ||
-       !black_direct_disjoint(root,0x50u,0x56EF30u,4u))return 0;
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2D12E4u),4u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2D67F4u),4u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2F4348u),1u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2AF460u),8u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x295C00u),0x1000u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2EDB00u),0x3000u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2F3600u),0xE00u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x2F4518u),0x20u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x563120u),0x1810u) ||
+       !black_direct_disjoint(root,0x50u,BLACK_VA(0x56EF30u),4u))return 0;
     /* Device setup/binding can update current resource reference words and
      * its command buffer. Keep the borrowed root outside those inputs too. */
-    device=GUEST32(0x27BFF8u);
+    device=GUEST32(BLACK_VA(0x27BFF8u));
     if(!black_direct_input(root,device,0x1A10u))return 0;
     write=GUEST32(device);end=GUEST32(device+4u);
     if(end<write || !black_direct_input(root,write,end-write))return 0;
@@ -4512,10 +4513,10 @@ void sub_000C5A80(void)
     const uint32_t self = g_ecx;
     uint64_t token = 0;
     int sampled = 0;
-    if (black_pc_ram_span(0x002D45E8u, 4u)) {
-        const uint32_t manager = GUEST32(0x002D45E8u);
+    if (black_pc_ram_span(BLACK_VA(0x002D45E8u), 4u)) {
+        const uint32_t manager = GUEST32(BLACK_VA(0x002D45E8u));
         if (black_pc_ram_span(manager, 0x1B8u) &&
-            self == manager + 0x98u && GUEST32(self) == 0x0028CE00u) {
+            self == manager + 0x98u && GUEST32(self) == BLACK_VA(0x0028CE00u)) {
             const uint32_t records = GUEST32(self + 0x118u);
             const uint32_t port = GUEST32(self + 0x11Cu);
             const uint64_t record = (uint64_t)records + (uint64_t)port * 32u;
@@ -4559,14 +4560,14 @@ void sub_000C5A80(void)
  */
 int black_pc_input_gameplay_blocked_query(void)
 {
-    if (black_pc_ram_span(0x002D45F0u, 4u)) {
-        const uint32_t main = GUEST32(0x002D45F0u);
+    if (black_pc_ram_span(BLACK_VA(0x002D45F0u), 4u)) {
+        const uint32_t main = GUEST32(BLACK_VA(0x002D45F0u));
         if (black_pc_ram_span(main, 0x210C9u) &&
             *(const uint8_t *)((uintptr_t)g_xbox_mem_offset + main + 0x210C8u))
             return 1;
     }
-    if (black_pc_ram_span(0x002D45D4u, 4u)) {
-        const uint32_t clock = GUEST32(0x002D45D4u);
+    if (black_pc_ram_span(BLACK_VA(0x002D45D4u), 4u)) {
+        const uint32_t clock = GUEST32(BLACK_VA(0x002D45D4u));
         if (black_pc_ram_span(clock, 0x29u) &&
             !*(const uint8_t *)((uintptr_t)g_xbox_mem_offset + clock + 0x28u))
             return 1;
@@ -4608,7 +4609,7 @@ static int black_controls_preset = -1;      /* the preset the game last filled t
 
 static int black_controls_preset_control(int preset, int slot)
 {
-    const uint32_t at = 0x002A7AF0u + (uint32_t)preset * 0x94u + (uint32_t)slot * 4u;
+    const uint32_t at = BLACK_VA(0x002A7AF0u) + (uint32_t)preset * 0x94u + (uint32_t)slot * 4u;
     uint32_t control;
     if (preset < 0 || preset >= PCC_PRESETS || slot < 0 || slot >= PCC_SLOTS || !black_pc_ram_span(at, 4u)) return -1;
     control = GUEST32(at);
@@ -4619,8 +4620,8 @@ static int black_controls_preset_control(int preset, int slot)
 static void black_controls_write_map(void)
 {
     uint32_t map, want[PCC_SLOTS], slot;
-    if (!black_pc_ram_span(0x002F3BD4u, 4u)) return;
-    map = GUEST32(0x002F3BD4u);
+    if (!black_pc_ram_span(BLACK_VA(0x002F3BD4u), 4u)) return;
+    map = GUEST32(BLACK_VA(0x002F3BD4u));
     if (!map || !black_pc_ram_span(map, PCC_SLOTS * 4u) || !pc_controls_pad_map(black_controls_preset, want)) return;
     for (slot = 0; slot < PCC_SLOTS; slot++)
         if (GUEST32(map + slot * 4u) != want[slot]) GUEST32(map + slot * 4u) = want[slot];
@@ -4747,12 +4748,12 @@ void sub_001EC450(void)
  * loaded XBE. No retail control table is embedded in the host source. */
 int black_pc_input_resolver(int slot)
 {
-    const uint32_t map_pointer = 0x002F3BD4u;
+    const uint32_t map_pointer = BLACK_VA(0x002F3BD4u);
     uint32_t map, control;
 
     if (slot < 0 || slot > 36) return -1;
     map = black_pc_ram_span(map_pointer, 4u) ? GUEST32(map_pointer) : 0;
-    if (!map || !black_pc_ram_span(map, 37u * 4u)) map = 0x002A7AF0u;
+    if (!map || !black_pc_ram_span(map, 37u * 4u)) map = BLACK_VA(0x002A7AF0u);
     if (!black_pc_ram_span(map, 37u * 4u)) return -1;
     control = GUEST32(map + (uint32_t)slot * 4u);
     return control < 28u ? (int)control : -1;
@@ -4773,7 +4774,7 @@ static void black_mouse_look(uint32_t camera)
     zoom_object = GUEST32(camera + 0x8Cu);
     if (black_pc_ram_span(zoom_object, 0x2A8u)) {
         /* the original's own expression: 1 / (((zoom - 1) * k) + 1) */
-        const double one = black_input_f32(0x00295C74u), k = black_input_f32(0x00295DB8u);
+        const double one = black_input_f32(BLACK_VA(0x00295C74u)), k = black_input_f32(BLACK_VA(0x00295DB8u));
         const double zoom = black_input_f32(zoom_object + 0x2A4u);
         const double denominator = (zoom - one) * k + one;
         if (isfinite(denominator) && denominator > 0.0 && isfinite(one) && one > 0.0)
@@ -4783,8 +4784,8 @@ static void black_mouse_look(uint32_t camera)
      * back: it adds no traps and no sticky flags to the guest's floating-point state. */
     yaw = (double)black_input_f32(camera + 0x18u) + yaw_delta * zoom_scale;
     pitch = (double)black_input_f32(camera + 0x1Cu) + pitch_delta * zoom_scale;
-    upper = black_input_f32(0x002888C8u);       /* +70 */
-    lower = black_input_f32(0x00295E38u);       /* -70 */
+    upper = black_input_f32(BLACK_VA(0x002888C8u));       /* +70 */
+    lower = black_input_f32(BLACK_VA(0x00295E38u));       /* -70 */
     if (isfinite(yaw) && isfinite(pitch) && isfinite(upper) && isfinite(lower) && lower < upper) {
         float yaw_value, pitch_value;
         yaw = fmod(yaw + 180.0, 360.0);          /* any size of turn, into [-180, 180) */
@@ -4818,7 +4819,7 @@ static void black_mouse_look(uint32_t camera)
 #include "pc_crosshair.h"
 #include "pc_debug.h"
 
-#define BLACK_SOLDIER_VTABLE 0x0028C1E8u
+#define BLACK_SOLDIER_VTABLE BLACK_VA(0x0028C1E8u)
 #define BLACK_SOLDIERS 96u
 static volatile LONG black_xh_list_gen;
 static uint32_t black_xh_list[BLACK_SOLDIERS];
@@ -4853,7 +4854,7 @@ static unsigned black_hit_next;
 extern void sub_001E74B0_gen(void);
 void sub_001E74B0(void)
 {
-    const uint32_t core = black_pc_ram_span(0x002D45D4u, 4u) ? GUEST32(0x002D45D4u) : 0;
+    const uint32_t core = black_pc_ram_span(BLACK_VA(0x002D45D4u), 4u) ? GUEST32(BLACK_VA(0x002D45D4u)) : 0;
     if (core && black_pc_ram_span(g_esp, 0x1Cu) && GUEST32(g_esp + 0x18u) == core + 0x30u) {
         const unsigned k = black_hit_next++ % BLACK_HITS;
         black_hit_soldier[k] = g_ecx;
@@ -4904,8 +4905,8 @@ static void black_crosshair_tick(uint32_t camera)
         QueryPerformanceFrequency(&frequency);
     }
     QueryPerformanceCounter(&now);
-    if (!black_pc_ram_span(0x002D45D4u, 4u)) goto done;
-    actor = GUEST32(0x002D45D4u) + 0x30u;
+    if (!black_pc_ram_span(BLACK_VA(0x002D45D4u), 4u)) goto done;
+    actor = GUEST32(BLACK_VA(0x002D45D4u)) + 0x30u;
     if (black_pc_ram_span(actor, 0xACu)) {
         const float x = black_input_f32(actor + 0xA0u), y = black_input_f32(actor + 0xA4u), z = black_input_f32(actor + 0xA8u);
         const double dt = have_last ? (double)(now.QuadPart - last.QuadPart) / (double)frequency.QuadPart : 0.0;
@@ -4917,7 +4918,7 @@ static void black_crosshair_tick(uint32_t camera)
         pc_debug_game_row(0, "POSITION", "%.1f   %.1f   %.1f", x, y, z);
         pc_debug_game_row(1, "SPEED", "%.1f", speed);
     }
-    if (black_pc_ram_span(0x002D12CCu, 4u) && black_pc_ram_span(stats_ptr = GUEST32(0x002D12CCu), 4u) &&
+    if (black_pc_ram_span(BLACK_VA(0x002D12CCu), 4u) && black_pc_ram_span(stats_ptr = GUEST32(BLACK_VA(0x002D12CCu)), 4u) &&
         black_pc_ram_span(GUEST32(stats_ptr), 0x4Au))
         shots = *(const uint16_t *)((uintptr_t)g_xbox_mem_offset + GUEST32(stats_ptr) + 0x48u);
     zoom_object = black_pc_ram_span(camera, 0x90u) ? GUEST32(camera + 0x8Cu) : 0;
@@ -5030,10 +5031,10 @@ void sub_00113BF0(void)
         uint32_t capacity = 0;
         int confirm_only = 0;
         switch (caller) {
-        case 0x00118630u: capacity = 256u; break;
-        case 0x00129EB7u: capacity = 120u; break;
-        case 0x0012B4EFu: capacity = 200u; break;
-        case 0x0012B4E0u: capacity = 64u; confirm_only = 1; break;   /* "\r\n\r\n<A> to continue" */
+        case BLACK_VA(0x00118630u): capacity = 256u; break;
+        case BLACK_VA(0x00129EB7u): capacity = 120u; break;
+        case BLACK_VA(0x0012B4EFu): capacity = 200u; break;
+        case BLACK_VA(0x0012B4E0u): capacity = 64u; confirm_only = 1; break;   /* "\r\n\r\n<A> to continue" */
         default: break;
         }
         if (capacity && black_pc_ram_span(buffer, capacity * 2u))

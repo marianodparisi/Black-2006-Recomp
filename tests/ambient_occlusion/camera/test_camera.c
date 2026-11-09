@@ -28,6 +28,7 @@ static uint32_t *guest_word(uint32_t address)
     fprintf(stderr,"Unexpected guest read %08X\n",address); exit(1);
 }
 #define GUEST32(p) (*guest_word(p))
+#define BLACK_VA(va) (va) /* fixtures use the canonical (NTSC) layout */
 static void kgpu_set_ao_camera(float x,float y)
 {
     ++publishes; memcpy(&observed_x,&x,4); memcpy(&observed_y,&y,4);

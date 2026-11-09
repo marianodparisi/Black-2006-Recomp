@@ -17,7 +17,7 @@ static void black_tuning_settings(PcVideoSettings *settings)
 static int black_tuning_enemy(uint32_t actor, int active)
 {
     if (!black_pc_ram_span(actor, 0x3B1u) ||
-        GUEST32(actor) != 0x0028C1E8u || GUEST32(actor + 0xC4u) != 1u)
+        GUEST32(actor) != BLACK_VA(0x0028C1E8u) || GUEST32(actor + 0xC4u) != 1u)
         return 0;
     /* Initialization calls the health setter before the controller is always
      * attached. Live bullet hits must belong to an active enemy actor. */
@@ -29,9 +29,9 @@ static int black_tuning_player_bullet(uint32_t victim, uint32_t shooter)
 {
     uint32_t core;
     if (!black_tuning_enemy(victim, 1) ||
-        !black_pc_ram_span(0x002D45D4u, 4u))
+        !black_pc_ram_span(BLACK_VA(0x002D45D4u), 4u))
         return 0;
-    core = GUEST32(0x002D45D4u);
+    core = GUEST32(BLACK_VA(0x002D45D4u));
     return black_pc_ram_span(core, 0x34u) && shooter == core + 0x30u;
 }
 

@@ -23,6 +23,7 @@ static size_t xbox_GetMappedSize(void) { return RAM_SIZE; }
 static void *xbox_GetPhysicalMemoryBase(void) { return NULL; }
 static void black_aspect_refresh(void) { }
 #define GUEST32(a) (*(uint32_t *)(ram + (a)))
+#define BLACK_VA(va) (va) /* fixtures use the canonical (NTSC) layout */
 #define CHECK(x) do { ++checks; if (!(x)) { fprintf(stderr,"FAIL %d %s\n",__LINE__,#x); exit(1); } } while(0)
 enum { UI=0x20000, RENDERER=0x30000, RESOURCE=0x70000, TABLE=0x70100,
        ENTRY=0x70200, NAME=0x70300, BLOCK=0x70400, CONSTANTS=0x70500,

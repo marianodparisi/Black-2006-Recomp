@@ -102,6 +102,7 @@ static int seed_explicit_default_override(const char *path)
 enum { SYNTH_GUEST_BYTES = 0x00400000, SYNTH_MAP_VA = 0x00310000 };
 static uint32_t g_synth_guest_memory[SYNTH_GUEST_BYTES / sizeof(uint32_t)];
 uint32_t g_ecx;
+#define BLACK_VA(va) (va) /* fixtures use the canonical (NTSC) layout */
 #define GUEST32(va) (g_synth_guest_memory[(uint32_t)(va) / sizeof(uint32_t)])
 
 static int black_pc_ram_span(uint32_t va, size_t bytes)

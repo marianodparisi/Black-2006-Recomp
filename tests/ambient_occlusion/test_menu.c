@@ -541,7 +541,7 @@ static void test_gameplay_pages(void)
     PcVideoSettings s;
     char log[4096];
     int variant, i;
-    CHECK(pc_menu_check_definition(k_black_menu_default, log, sizeof(log)) == 24 && !log[0],
+    CHECK(pc_menu_check_definition(k_black_menu_default, log, sizeof(log)) == 25 && !log[0],
           "the production definition parses, including Gameplay settings and PC SETTINGS: '%s'", log);
     for (variant = 0; variant < 2; variant++) {
         const char *page = options[variant];
@@ -972,6 +972,66 @@ static void test_pointer_focus_after_page_change(void)
           pc_menu_test_focus());
 }
 
+/* The Difficulty page: four levels, those above FE_MissionDifficulty locked, the first focus from
+ * FE_DifficultySelection (or the highest open level below it), a description per level as the focus moves. */
+static void test_difficulty(void)
+{
+    static const char def[] =
+        "[page Difficulty]\n"
+        "title = $FE_DIFFICULTYSELECT\n"
+        "list = 253 133 28\n"
+        "text = 203 252 &FE_DIFFICULTYDESC | wrap 380\n"
+        "focus_from = FE_DifficultySelection\n"
+        "back = gamecode DifficultyBack\n"
+        "item = $FE_EASY | gamecode SelectedDifficulty 0 | focus gamecode UpdateDificulty 0\n"
+        "item = $FE_NORMAL | gamecode SelectedDifficulty 1 | focus gamecode UpdateDificulty 1 | disabled unless FE_MissionDifficulty>1\n"
+        "item = $FE_HARD | gamecode SelectedDifficulty 2 | focus gamecode UpdateDificulty 2 | disabled unless FE_MissionDifficulty>2\n"
+        "item = $FE_BLACKOPS | gamecode SelectedDifficulty 3 | focus gamecode UpdateDificulty 3 | disabled unless FE_MissionDifficulty>3\n"
+        ;
+    reset_game();
+    value_set("FE_MissionDifficulty", 1); value_set("FE_DifficultySelection", 0);
+    pc_menu_test_reset(def);
+    tick("");
+    CHECK(tick("Difficulty") == 1, "Difficulty is native");
+    CHECK(pc_menu_test_focus() == 0, "only Easy open: the focus is on Easy (%d)", pc_menu_test_focus());
+    press(PCM_ACT_DOWN, "Difficulty");
+    CHECK(pc_menu_test_focus() == 0, "the locked levels are not offered (%d)", pc_menu_test_focus());
+    log_clear();
+    press(PCM_ACT_CONFIRM, "Difficulty");
+    CHECK(strstr(g_log, "gamecode SelectedDifficulty 0 0 0") != NULL, "choosing Easy starts it: '%s'", g_log);
+
+    reset_game();
+    value_set("FE_MissionDifficulty", 3); value_set("FE_DifficultySelection", 1);
+    pc_menu_test_reset(def);
+    tick(""); tick("Difficulty");
+    CHECK(pc_menu_test_focus() == 1, "the focus starts on the game's selection, Normal (%d)", pc_menu_test_focus());
+    log_clear();
+    press(PCM_ACT_DOWN, "Difficulty");
+    CHECK(pc_menu_test_focus() == 2, "Hard follows Normal when open (%d)", pc_menu_test_focus());
+    CHECK(strstr(g_log, "gamecode UpdateDificulty 2 0 0") != NULL, "moving onto Hard shows its description: '%s'", g_log);
+    press(PCM_ACT_DOWN, "Difficulty");
+    CHECK(pc_menu_test_focus() == 0, "locked Black is skipped, back round to Easy (%d)", pc_menu_test_focus());
+    press(PCM_ACT_UP, "Difficulty");
+    log_clear();
+    press(PCM_ACT_CONFIRM, "Difficulty");
+    CHECK(strstr(g_log, "gamecode SelectedDifficulty 2 0 0") != NULL, "choosing Hard starts it: '%s'", g_log);
+
+    reset_game();
+    value_set("FE_MissionDifficulty", 2); value_set("FE_DifficultySelection", 3);
+    pc_menu_test_reset(def);
+    tick(""); tick("Difficulty");
+    CHECK(pc_menu_test_focus() == 1, "a selection above the open levels starts on the highest open one (%d)", pc_menu_test_focus());
+    log_clear();
+    press(PCM_ACT_BACK, "Difficulty");
+    CHECK(strstr(g_log, "gamecode DifficultyBack") != NULL, "back is the game's DifficultyBack: '%s'", g_log);
+
+    reset_game();
+    value_set("FE_MissionDifficulty", 4); value_set("FE_DifficultySelection", 3);
+    pc_menu_test_reset(def);
+    tick(""); tick("Difficulty");
+    CHECK(pc_menu_test_focus() == 3, "all open: the focus can start on Black (%d)", pc_menu_test_focus());
+}
+
 static void test_mission_failed(void)
 {
     reset_game();
@@ -1214,7 +1274,7 @@ static void test_gameplay_default_migration(void)
     pc_menu_set_replaced_defaults(k_black_menu_replaced, (int)(sizeof(k_black_menu_replaced) / sizeof(k_black_menu_replaced[0])));
     file_put(path, previous);
     pages = pc_menu_test_load_file(path);
-    CHECK(pages == 24 && file_is(path, k_black_menu_default), "untouched shipping menu upgrades to optional secondaries");
+    CHECK(pages == 25 && file_is(path, k_black_menu_default), "untouched shipping menu upgrades to optional secondaries");
     tick(""); tick("OptionsMenuXbox");
     for (i = 0; i < 4; i++) press(PCM_ACT_DOWN, "OptionsMenuXbox");
     press(PCM_ACT_CONFIRM, "OptionsMenuXbox");
@@ -1243,7 +1303,7 @@ static void test_tuning_default_migration(void)
     pc_menu_set_default_definition(k_black_menu_default);
     pc_menu_set_replaced_defaults(k_black_menu_replaced, (int)(sizeof(k_black_menu_replaced) / sizeof(k_black_menu_replaced[0])));
     file_put(path, k_black_menu_before_tuning);
-    CHECK(pc_menu_test_load_file(path) == 24 && file_is(path, k_black_menu_default),
+    CHECK(pc_menu_test_load_file(path) == 25 && file_is(path, k_black_menu_default),
           "untouched prior menu upgrades to tuning controls");
     tick(""); tick("OptionsMenuXbox");
     for (i = 0; i < 4; i++) press(PCM_ACT_DOWN, "OptionsMenuXbox");
@@ -1328,6 +1388,11 @@ static void test_pc_settings_default_migration(void)
         free(previous);
         return;
     }
+    {   /* that default has no native Difficulty page (this fork's addition) */
+        char *from = strstr(previous, "; Choosing the difficulty"), *to = from ? strstr(from, "; The main menu once a mission is done.") : NULL;
+        CHECK(to != NULL, "the Difficulty page can be taken out of the migration fixture");
+        if (to) memmove(from, to, strlen(to) + 1);
+    }
     CHECK(fnv1a64(previous) == 0xEAF5EBB9916959FBull,
           "PC SETTINGS migration fixture is the exact immediate prior shipping default");
     for (i = 0; i < (int)(sizeof(k_black_menu_replaced) / sizeof(k_black_menu_replaced[0])); i++)
@@ -1341,9 +1406,9 @@ static void test_pc_settings_default_migration(void)
     pc_menu_set_replaced_defaults(k_black_menu_replaced, (int)(sizeof(k_black_menu_replaced) / sizeof(k_black_menu_replaced[0])));
     file_put(path, previous);
     pages = pc_menu_test_load_file(path);
-    CHECK(pages == 24 && file_is(path, k_black_menu_default),
+    CHECK(pages == 25 && file_is(path, k_black_menu_default),
           "untouched immediate prior menu upgrades to PC SETTINGS");
-    if (pages == 24 && file_is(path, k_black_menu_default)) {
+    if (pages == 25 && file_is(path, k_black_menu_default)) {
         tick("");
         CHECK(tick("PauseMenu") == 1 && pc_menu_test_focus() == 0, "the migrated pause menu starts on Continue");
         press(PCM_ACT_DOWN, "PauseMenu");
@@ -1901,6 +1966,7 @@ int main(int argc, char **argv)
     test_confirm();
     test_mixed();
     test_options();
+    test_difficulty();
     test_mission_failed();
     test_exit_game();
     test_replaced_default();

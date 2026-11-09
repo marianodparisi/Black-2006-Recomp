@@ -27,9 +27,9 @@ void sub_000205A0(void)
         const uint16_t *fine = (const uint16_t *)(m + GUEST32(self + 4) + (size_t)idx * 6);
         float c1, c2, c3;
         __m128 t, v;
-        memcpy(&c1, m + 0x295D84u, 4);
-        memcpy(&c2, m + 0x295D80u, 4);
-        memcpy(&c3, m + 0x295D8Cu, 4);
+        memcpy(&c1, m + BLACK_VA(0x295D84u), 4);
+        memcpy(&c2, m + BLACK_VA(0x295D80u), 4);
+        memcpy(&c3, m + BLACK_VA(0x295D8Cu), 4);
         t = _mm_setr_ps((float)(int32_t)(int8_t)m[self + 0xA], (float)(int32_t)(int8_t)m[self + 0xB],
                         (float)(int32_t)(int8_t)m[self + 0xC], 0.0f);
         v = _mm_setr_ps((float)(int32_t)fine[0], (float)(int32_t)fine[1], (float)(int32_t)fine[2], 0.0f);

@@ -552,6 +552,27 @@ static const char black_menu_definition[] =
 "item = \"ONE PLAYER\" | set SplitPlayers 1\r\n"
 "item = \"TWO PLAYERS (EXPERIMENTAL)\" | set SplitPlayers 2\r\n"
 "\r\n"
+"; Choosing the difficulty (the game's difficulty page, opened by START MISSION and before a mission is replayed).\r\n"
+"; Levels 0 easy, 1 normal, 2 hard, 3 black. FE_MissionDifficulty counts the levels open to the player (easy always);\r\n"
+"; the page starts on FE_DifficultySelection, or the highest open level below it. Moving onto a level shows its\r\n"
+"; description (UpdateDificulty, the game's own spelling); choosing it starts the mission (SelectedDifficulty).\r\n"
+"[page Difficulty]\r\n"
+"column = 00000000\r\n"
+"logo = 188 39\r\n"
+"rails = 60 163\r\n"
+"title = $FE_DIFFICULTYSELECT\r\n"
+"title_at = 203 67\r\n"
+"list = 253 128 28\r\n"
+"text = 203 252 &FE_DIFFICULTYDESC | wrap 380 | size 12\r\n"
+"prompts = select confirm back\r\n"
+"prompts_at = 224 372 28\r\n"
+"focus_from = FE_DifficultySelection\r\n"
+"back = gamecode DifficultyBack\r\n"
+"item = $FE_EASY | gamecode SelectedDifficulty 0 | focus gamecode UpdateDificulty 0\r\n"
+"item = $FE_NORMAL | gamecode SelectedDifficulty 1 | focus gamecode UpdateDificulty 1 | disabled unless FE_MissionDifficulty>1\r\n"
+"item = $FE_HARD | gamecode SelectedDifficulty 2 | focus gamecode UpdateDificulty 2 | disabled unless FE_MissionDifficulty>2\r\n"
+"item = $FE_BLACKOPS | gamecode SelectedDifficulty 3 | focus gamecode UpdateDificulty 3 | disabled unless FE_MissionDifficulty>3\r\n"
+"\r\n"
 "; The main menu once a mission is done.\r\n"
 "[page blacktitlemenu]\r\n"
 "column = 00000000\r\n"
@@ -589,7 +610,7 @@ static const char black_menu_definition[] =
 static const uint64_t black_menu_replaced[] = { 0xEAF5EBB9916959FBull, 0xB267900B51F80A2Aull, 0xD8419D900AB2FEA6ull, 0xBBE0D874943DB641ull, 0x9F7652C358180DC6ull,
                                                 0xFF74A7E07CF4C7F0ull, 0x33977C1E8AC020F3ull, 0xB86AB9AC7D0F4406ull,
                                                 0xDC483F969B68C28Aull, 0x9EE07629CB313D32ull, 0xC6D3B76BDD8FC724ull,
-                                                0xCAB7BCC76B5F689Aull, 0x53E79C5FCD83D531ull, 0x8895E21EE19C8166ull, 0x5984EE9CC11281D1ull, 0x80C09B1E7F97E61Full, 0x93A312A22FFF08EAull, 0x3846873DAB993010ull, 0x3CD00D866F39BFB4ull };
+                                                0xCAB7BCC76B5F689Aull, 0x53E79C5FCD83D531ull, 0x8895E21EE19C8166ull, 0x5984EE9CC11281D1ull, 0x80C09B1E7F97E61Full, 0x93A312A22FFF08EAull, 0x3846873DAB993010ull, 0x3CD00D866F39BFB4ull, 0x61EED58A5AB79D6Full, 0x686E7C019E46A34Dull };
 
 /* ---- guest helpers --------------------------------------------------------------------------------------- */
 
@@ -601,7 +622,7 @@ static uint32_t bnm_hash(const char *s)
     for (; *s; s++) {
         const uint32_t i = ((c & 0xFFu) ^ (uint32_t)(int32_t)(signed char)*s) & 0xFFFFFFFFu;
         if (i > 255u) return 0;                         /* the game's keys are ASCII */
-        c = ((c >> 8) | ((c & 0x80000000u) ? 0xFF000000u : 0u)) ^ GUEST32(0x002AC908u + i * 4u);
+        c = ((c >> 8) | ((c & 0x80000000u) ? 0xFF000000u : 0u)) ^ GUEST32(BLACK_VA(0x002AC908u) + i * 4u);
     }
     return c;
 }
@@ -617,7 +638,7 @@ static int bnm_guest_call(void (*fn)(void), uint32_t eax, const uint32_t *args, 
     unsigned i;
     if (s_esp < 0x20000u || !black_pc_ram_span(sp - 4u * (n + 1u), 4u * (n + 1u) + 0x200u)) return 0;
     for (i = n; i-- > 0;) { sp -= 4u; GUEST32(sp) = args[i]; }
-    sp -= 4u; GUEST32(sp) = 0x00124330u;              /* returns into the front-end update, like its own calls */
+    sp -= 4u; GUEST32(sp) = BLACK_VA(0x00124330u);              /* returns into the front-end update, like its own calls */
     g_esp = sp; g_eax = eax;
     fn();
     result = g_eax;
@@ -665,7 +686,7 @@ static uint32_t bnm_bound(uint32_t ui, uint32_t table_offset, uint32_t hash, uin
 static uint32_t bnm_string_from_manager(uint32_t tm, uint32_t hash)
 {
     unsigned t;
-    if (!tm || !black_pc_ram_span(0x002F3B0Eu, 1u) || !*(const uint8_t *)((uintptr_t)g_xbox_mem_offset + 0x002F3B0Eu) ||
+    if (!tm || !black_pc_ram_span(BLACK_VA(0x002F3B0Eu), 1u) || !*(const uint8_t *)((uintptr_t)g_xbox_mem_offset + BLACK_VA(0x002F3B0Eu)) ||
         !black_pc_ram_span(tm + 0xCE8u, 44u)) return 0;
     for (t = 0; t < 11u; t++) {
         const uint32_t table = GUEST32(tm + 0xCE8u + t * 4u);
@@ -692,7 +713,7 @@ static uint32_t bnm_string_from_manager(uint32_t tm, uint32_t hash)
 /* Native menu helpers without an explicit manager use BLACK's global instance. */
 static uint32_t bnm_string(uint32_t hash)
 {
-    const uint32_t tm = black_pc_ram_span(0x002D45D8u, 4u) ? GUEST32(0x002D45D8u) : 0u;
+    const uint32_t tm = black_pc_ram_span(BLACK_VA(0x002D45D8u), 4u) ? GUEST32(BLACK_VA(0x002D45D8u)) : 0u;
     return bnm_string_from_manager(tm, hash);
 }
 
@@ -708,6 +729,23 @@ static int bnm_utf8_to_utf16(uint32_t at, uint16_t *out, unsigned cap)
         else if (c >= 0xE0 && c < 0xF0 && black_pc_ram_span(p + 2u, 1u) && (u[1] & 0xC0) == 0x80 && (u[2] & 0xC0) == 0x80) {
             c = ((c & 0x0Fu) << 12) | ((u[1] & 0x3Fu) << 6) | (u[2] & 0x3Fu); p += 3;
         } else p += 1;
+        out[n++] = (uint16_t)c;
+    }
+    out[n] = 0;
+    return (int)n;
+}
+
+/* The same for a string of this program (the localized keyboard prompts). */
+static int bnm_host_utf8_to_utf16(const char *text, uint16_t *out, unsigned cap)
+{
+    const uint8_t *u = (const uint8_t *)text;
+    unsigned n = 0;
+    while (n + 1 < cap && *u) {
+        unsigned c = u[0];
+        if (c >= 0xC0 && c < 0xE0 && (u[1] & 0xC0) == 0x80) { c = ((c & 0x1Fu) << 6) | (u[1] & 0x3Fu); u += 2; }
+        else if (c >= 0xE0 && c < 0xF0 && (u[1] & 0xC0) == 0x80 && (u[2] & 0xC0) == 0x80) {
+            c = ((c & 0x0Fu) << 12) | ((u[1] & 0x3Fu) << 6) | (u[2] & 0x3Fu); u += 3;
+        } else u += 1;
         out[n++] = (uint16_t)c;
     }
     out[n] = 0;
@@ -766,12 +804,12 @@ static int bnm_text(void *ctx, const char *spec, uint16_t *out, unsigned cap)
         if (pc_input_prompt_device() == PC_DEVICE_KEYBOARD_MOUSE)
             for (i = 0; i < sizeof(black_menu_prompts) / sizeof(black_menu_prompts[0]); i++) {
                 char label[16], text[96];
+                const char *language = getenv("RECOMP_LANGUAGE");
                 if (black_menu_prompts[i].hash != hash) continue;
                 if (!pc_input_menu_text((PcMenuKey)black_menu_prompts[i].key, label, sizeof(label))) break;
-                snprintf(text, sizeof(text), "%s%s%s", black_menu_prompts[i].before, label, black_menu_prompts[i].after);
-                for (s = 0; text[s] && s + 1 < cap; s++) out[s] = (uint8_t)text[s];
-                out[s] = 0;
-                return (int)s;
+                snprintf(text, sizeof(text), "%s%s%s", black_menu_prompt_localize(black_menu_prompts[i].before, language),
+                         label, black_menu_prompt_localize(black_menu_prompts[i].after, language));
+                return bnm_host_utf8_to_utf16(text, out, cap);
             }
         s = bnm_string(hash);
         return s ? bnm_utf8_to_utf16(black_pc_brand_guest(s), out, cap) : -1;
@@ -977,7 +1015,7 @@ static void black_native_menu_tick(uint32_t ui)
     char page[40];
     int ready, active;
     const unsigned caller_csr = _mm_getcsr();
-    if (!ui || ui != GUEST32(0x002D199Cu) || !black_pc_ram_span(ui, 0x3960u)) return;
+    if (!ui || ui != GUEST32(BLACK_VA(0x002D199Cu)) || !black_pc_ram_span(ui, 0x3960u)) return;
     {
         /* Lab only: RECOMP_MENU_GOTO=Page[@FromPage] asks the game for that page once the pause menu (or FromPage) has
          * been up for two seconds, with the native pages on or off -- to see pages a short scripted run cannot reach. */
@@ -1105,7 +1143,7 @@ static void black_audio_settings_tick(uint32_t ui)
     static uint32_t traced[4];
     static char path[MAX_PATH];
     const unsigned caller_csr = _mm_getcsr();
-    const uint32_t game = GUEST32(0x002D45F0u), audio = GUEST32(0x002D0D60u);
+    const uint32_t game = GUEST32(BLACK_VA(0x002D45F0u)), audio = GUEST32(BLACK_VA(0x002D0D60u));
     if (!ui || !game || !audio || !black_pc_ram_span(game + 0x2015Cu, 8u) || !black_pc_ram_span(audio + 0xD3B4u, 0x18u)) return;
     if (!restored) {
         const uint32_t engine = GUEST32(audio + 0xD3C8u);
@@ -1119,9 +1157,9 @@ static void black_audio_settings_tick(uint32_t ui)
             const BlackRegs none = {0};
             GUEST32(game + 0x2015Cu) = black_audio_bits(sfx);
             GUEST32(game + 0x20160u) = black_audio_bits(music);
-            GUEST32(0x002F416Cu) = (uint32_t)sfx;     /* what the options pages rebuild both volumes from */
-            GUEST32(0x002F4170u) = (uint32_t)music;
-            black_guest_call(sub_00119B50, &none, NULL, 0, 0x00124330u);
+            GUEST32(BLACK_VA(0x002F416Cu)) = (uint32_t)sfx;     /* what the options pages rebuild both volumes from */
+            GUEST32(BLACK_VA(0x002F4170u)) = (uint32_t)music;
+            black_guest_call(sub_00119B50, &none, NULL, 0, BLACK_VA(0x00124330u));
             fprintf(stderr, "[AUDIO] %s: SFX %d, music %d\n", path, sfx, music);
         }
         black_audio_saver_start(&saver, sfx, music);

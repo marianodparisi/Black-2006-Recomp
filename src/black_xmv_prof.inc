@@ -77,7 +77,7 @@ void sub_0023F45C(void)
         win_calls++; win_ticks += dt; if (dt > win_max) win_max = dt;
         {   /* a run of idle calls (status 0) followed by progress: report how long the run took */
             static long long run_calls, run_t0; static uint32_t run_vb0;
-            uint32_t dev2 = GUEST32(0x27BFF8), vb = dev2 ? GUEST32(dev2 + 0x1DE8) : 0;
+            uint32_t dev2 = GUEST32(BLACK_VA(0x27BFF8)), vb = dev2 ? GUEST32(dev2 + 0x1DE8) : 0;
             static uint32_t snap[0x60];
             if (st == 0 && run_calls == 20000) {
                 int w;
@@ -107,7 +107,7 @@ void sub_0023F45C(void)
         for (pk = 0; pk < 6 && !pplaced; pk++) if (pair_n[pk] && pairs[pk][0] == res && pairs[pk][1] == st) { pair_n[pk]++; pplaced = 1; }
         for (pk = 0; pk < 6 && !pplaced; pk++) if (!pair_n[pk]) { pairs[pk][0] = res; pairs[pk][1] = st; pair_n[pk] = 1; pplaced = 1; }
         if (win_calls == 1) {
-            uint32_t dev = GUEST32(0x27BFF8);
+            uint32_t dev = GUEST32(BLACK_VA(0x27BFF8));
             first_dec = dec; first_b8 = GUEST32(dec + 0xB8); first_6c = GUEST32(dec + 0x6C);
             first_vb = dev ? GUEST32(dev + 0x1DE8) : 0;
         }

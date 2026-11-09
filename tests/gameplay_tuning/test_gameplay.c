@@ -9,6 +9,7 @@
 static uint8_t ram[0x300000];
 static PcVideoSettings chosen;
 static int disturb_settings_fp;
+#define BLACK_VA(va) (va) /* fixtures use the canonical (NTSC) layout */
 #define GUEST32(a) (*(uint32_t *)(ram + (a)))
 #define GUEST8(a) (ram[(a)])
 static int black_pc_ram_span(uint32_t address, uint32_t bytes)

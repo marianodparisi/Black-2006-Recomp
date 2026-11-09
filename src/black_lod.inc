@@ -48,8 +48,8 @@ void black_lod_trace(uint32_t site, uint32_t object)
     fenv_t caller_environment;
     unsigned caller_csr;
     if (!enabled || strcmp(enabled, "1") || emitted >= 512u || !black_pc_ram_span(object, 0xC9u) ||
-        !black_pc_ram_span(0x002D12B8u, 4u)) return;
-    camera = GUEST32(0x002D12B8u);
+        !black_pc_ram_span(BLACK_VA(0x002D12B8u), 4u)) return;
+    camera = GUEST32(BLACK_VA(0x002D12B8u));
     if (!black_pc_ram_span(camera, 0x16A4u)) return;
     caller_csr = _mm_getcsr();
     fegetenv(&caller_environment);
