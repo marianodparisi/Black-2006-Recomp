@@ -37,6 +37,10 @@ add_executable(movie-overlay-test test_overlay.c
 target_compile_definitions(movie-overlay-test PRIVATE PC_MOVIE_SKIP_TEST)
 target_link_libraries(movie-overlay-test PRIVATE user32 gdi32 shell32 ole32)
 
+# The real gameplay caption session on a test clock (PC_SPEECH_SUBTITLE_TEST).
+add_executable(movie-speech-caption-test test_speech_caption.c "${XBOXRECOMP_DIR}/src/video/pc_speech_subtitle.c")
+target_compile_definitions(movie-speech-caption-test PRIVATE PC_SPEECH_SUBTITLE_TEST)
+
 add_executable(movie-wrapper-test test_wrapper.c)
 target_include_directories(movie-wrapper-test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
@@ -44,7 +48,7 @@ add_executable(movie-prompt-localization-test test_prompt_localization.c)
 add_executable(frontend-string-fallback-test test_frontend_string_fallback.c)
 add_executable(movie-picture-test test_picture.c)
 
-foreach(target movie-input-test movie-overlay-test movie-wrapper-test movie-prompt-localization-test frontend-string-fallback-test movie-picture-test)
+foreach(target movie-input-test movie-overlay-test movie-speech-caption-test movie-wrapper-test movie-prompt-localization-test frontend-string-fallback-test movie-picture-test)
     target_include_directories(${target} PRIVATE
         "${XBOXRECOMP_DIR}/src/video" "${XBOXRECOMP_DIR}/src/input")
     target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS WIN32_LEAN_AND_MEAN NOMINMAX)
@@ -60,6 +64,7 @@ endforeach()
 enable_testing()
 add_test(NAME movie-input COMMAND movie-input-test)
 add_test(NAME movie-overlay COMMAND movie-overlay-test)
+add_test(NAME movie-speech-caption COMMAND movie-speech-caption-test WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 add_test(NAME movie-wrapper COMMAND movie-wrapper-test)
 add_test(NAME movie-prompt-localization COMMAND movie-prompt-localization-test)
 add_test(NAME frontend-string-fallback COMMAND frontend-string-fallback-test)
@@ -68,4 +73,4 @@ add_test(NAME movie-subtitle-catalog
     COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_SOURCE_DIR}/validate_subtitle_catalog.py"
         --root "${CMAKE_CURRENT_SOURCE_DIR}/../..")
-set_tests_properties(movie-input movie-overlay movie-wrapper movie-prompt-localization frontend-string-fallback movie-subtitle-catalog PROPERTIES TIMEOUT 15)
+set_tests_properties(movie-input movie-overlay movie-speech-caption movie-wrapper movie-prompt-localization frontend-string-fallback movie-subtitle-catalog PROPERTIES TIMEOUT 15)

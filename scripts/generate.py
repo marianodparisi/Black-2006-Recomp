@@ -384,6 +384,9 @@ def title_hooks(name, body):
         body, count = re.subn(r"(xmm[01]\.f\[0\] = xmm[01]\.f\[0\] \* )(MEMF\(l_esi \+ 0xCC\))", r"\1black_ctl_k(\2)", body)
         if count != 2:
             raise ValueError("Angular filter hook missing")
+    if name == "sub_0026CC10":
+        body = replace_once(body, "if (CMP_B(_fa, _fb)) goto loc_0026CD80;", "if (CMP_B(_fa, _fb)) { black_ring_wait(); goto loc_0026CD80; }")
+        body = replace_once(body, "loc_0026CD8A: ;\n", "loc_0026CD8A: ;\n    black_ring_wait_done();\n")
     if name == "sub_001F9130":
         label = "loc_001F91A5: ;\n"
         start = body.index(label) + len(label)
@@ -1040,6 +1043,8 @@ def main():
     chunks = sorted(generated.glob("recomp_[0-9]*.c"))
     emit_idct("\n".join(path.read_text(encoding="utf-8") for path in chunks), root / "src/black_xmv_idct.inc")
     declarations = "\nextern float black_osc_factor(void);\nextern float black_ctl_k(float);\nextern void black_movie_tag_flip(uint32_t);\nextern void black_pickup_text_ready(uint32_t);\nextern void black_weapon_trace(uint32_t, uint32_t);\nextern void black_weapon_model_trace(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);\nextern void black_weapon_attachment_trace(uint32_t, uint32_t);\nextern void black_viewmodel_muzzle_gate(uint32_t);\nextern void black_test_weapon_loadout(uint32_t);\nextern void black_viewmodel_owner(uint32_t);\nextern uint32_t black_viewmodel_draw_begin(uint32_t);\nextern void black_viewmodel_draw_end(uint32_t);\nextern void black_viewmodel_constants(uint32_t);\nextern void black_viewmodel_muzzle_constants(uint32_t, uint32_t);\n"
+    declarations += "extern void black_ring_wait(void);\n"
+    declarations += "extern void black_ring_wait_done(void);\n"
     declarations += "extern int black_silver_weapon_flag(int);\n"
     declarations += "extern float black_physics_drag(float);\n"
     declarations += "extern int black_infinite_ammo_flag(int);\n"

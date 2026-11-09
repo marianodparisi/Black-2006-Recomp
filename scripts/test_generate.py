@@ -451,6 +451,28 @@ def test_secondary_objective_boundaries():
     assert generate.secondary_objective_hooks("unrelated", "unchanged") == "unchanged"
 
 
+def test_ring_wait_hooks_the_poll_and_its_exit():
+    body = (
+        "loc_0026CD80: ;\n"
+        "    l_ecx = MEM32(l_edx);\n"
+        "    if (CMP_B(_fa, _fb)) goto loc_0026CD80; /* jb: below (unsigned <) */\n"
+        "\n"
+        "loc_0026CD8A: ;\n"
+        "    POP32(l_esp, l_ebx);\n"
+    )
+    hooked = generate.title_hooks("sub_0026CC10", body)
+    poll = hooked.index("{ black_ring_wait(); goto loc_0026CD80; }")
+    done = hooked.index("loc_0026CD8A: ;\n    black_ring_wait_done();\n    POP32(l_esp, l_ebx);")
+    assert poll < done
+    assert generate.title_hooks("sub_0026CC11", body) == body
+    try:
+        generate.title_hooks("sub_0026CC10", body.replace("loc_0026CD8A", "loc_0026CD8B"))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a missing exit label must stop generation")
+
+
 def test_controls_wrapper_keeps_generated_body_as_gen():
     repo = Path(__file__).resolve().parents[1]
     scanner_path = repo / "third_party/xboxrecomp/tools/recomp/manual_scan.py"
@@ -488,4 +510,5 @@ if __name__ == "__main__":
     test_native_lab_streaming_boundary()
     test_scope_mask_native_boundary()
     test_controls_wrapper_keeps_generated_body_as_gen()
-    print("17 checks passed")
+    test_ring_wait_hooks_the_poll_and_its_exit()
+    print("18 checks passed")

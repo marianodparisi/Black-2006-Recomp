@@ -25,6 +25,7 @@ typedef struct {
     TestMutex lock;
     TestCond cond, lock_handoff_cond;
     volatile LONG lock_waiters;
+    volatile LONG irq_service_declined;
     bool lock_handoff_waiting;
     uint32_t regs[0x20000];
     unsigned ep_frame_div, next_frame_time_fraction;
@@ -34,7 +35,7 @@ typedef struct {
     bool pause_requested;
 } MCPXAPUState;
 
-static unsigned checks, failures, waits, handoffs, pending, serviced;
+static unsigned checks, failures, waits, handoffs, pending, serviced, drains, irq_updates;
 static bool held, threaded;
 static int64_t now_us;
 static MCPXAPUState *current;
@@ -100,11 +101,21 @@ static void qemu_cond_timedwait(TestCond *cond, TestMutex *lock, int ms)
 static void qemu_cond_broadcast(TestCond *cond) { (void)cond; }
 static int64_t qemu_clock_get_us(int type) { (void)type; return now_us; }
 static int64_t qemu_clock_get_ns(int type) { (void)type; return now_us * 1000; }
-static void update_irq(MCPXAPUState *d) { (void)d; }
+static void update_irq(MCPXAPUState *d) { (void)d; ++irq_updates; }
 #define address_space_memory NULL
 static void stl_le_phys(void *space, uint32_t addr, uint32_t val)
 { (void)space; (void)addr; (void)val; }
 #include "apu_lock.h"
+/* apu_vp.c: guest threads waiting to write a PIO method, and the queue of
+ * methods they left for the next lock holder. */
+volatile LONG g_apu_pio_waiters;
+void mcpx_apu_pio_drain(MCPXAPUState *d);
+void mcpx_apu_pio_drain(MCPXAPUState *d)
+{
+    (void)d;
+    if (!threaded) CHECK(held);
+    ++drains;
+}
 #include "throttle.inc"
 
 static void service_pending(void)
@@ -132,7 +143,7 @@ static void prepare(MCPXAPUState *d)
     InitializeConditionVariable(&d->lock_handoff_cond);
 #endif
     current = d;
-    pending = serviced = waits = handoffs = 0;
+    pending = serviced = waits = handoffs = drains = irq_updates = 0;
     now_us = 1000000;
     d->next_frame_time_us = now_us;
     qemu_mutex_lock(&d->lock);
@@ -208,6 +219,47 @@ static void control_during_handoff(MCPXAPUState *d)
         CHECK(waits == 0);
         finish(d);
     }
+}
+
+/* The frame thread keeps the device lock across frames: a register read does
+ * not wait for it (here, single-threaded, it must not take it at all). */
+static void reads_skip_the_lock(MCPXAPUState *d)
+{
+    prepare(d);
+    d->regs[NV_PAPU_IEN] = 0x2468;
+    CHECK(mcpx_apu_read(d, NV_PAPU_IEN, 4) == 0x2468);
+    CHECK(held && d->lock_waiters == 0);
+    finish(d);
+}
+
+/* PIO methods queued while the lock was busy run before a later register
+ * write from the guest, as they did when each method waited for the lock. */
+static void writes_keep_method_order(MCPXAPUState *d)
+{
+    prepare(d);
+    qemu_mutex_unlock(&d->lock);
+    mcpx_apu_write(d, NV_PAPU_IEN, 0x1357, 4);
+    CHECK(drains == 1 && d->regs[NV_PAPU_IEN] == 0x1357 && !held);
+    qemu_mutex_lock(&d->lock);
+    finish(d);
+}
+
+/* An interrupt delivery the guard declined is served at the next epoch: the
+ * line is recomputed (waking the timer thread) and the lock is handed off once,
+ * as for a blocked caller, so an overloaded DSP cannot keep the ISR out. */
+static void declined_irq_gets_a_handoff(MCPXAPUState *d)
+{
+    prepare(d);
+    d->irq_service_declined = 1;
+    throttle(d);
+    CHECK(handoffs == 1 && irq_updates == 1 && d->irq_service_declined == 0 && held);
+    for (unsigned frame = 1; frame <= 8; ++frame) {
+        d->ep_frame_div = frame;
+        throttle(d);
+    }
+    CHECK(handoffs == 1 && irq_updates == 1);
+    CHECK(d->lock_waiters == 0 && !d->lock_handoff_waiting);
+    finish(d);
 }
 
 #ifdef _WIN32
@@ -287,6 +339,9 @@ int main(void)
     normal_pacing(d);
     uncontended_epoch(d);
     control_during_handoff(d);
+    reads_skip_the_lock(d);
+    writes_keep_method_order(d);
+    declined_irq_gets_a_handoff(d);
 #ifdef _WIN32
     competing_register_clients(d);
     recursive_register_access(d);

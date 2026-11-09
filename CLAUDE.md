@@ -4,9 +4,9 @@
 
 ## Base actual (2026-11-08)
 
-La rama `upstream-sync` parte de `upstream/main` (`4044403`, alpha.5 y más) y lleva encima solo lo propio: PAL, la dificultad de 4 niveles, el negro de los carteles, el idioma por consola y `RECOMP_APU_MUTE`. **Donde este archivo diga lo contrario, vale esto:**
+La rama `upstream-sync` parte de `upstream/main` (alpha.5 y más; se trae con `git merge upstream/main`) y lleva encima solo lo propio: PAL, la dificultad de 4 niveles, el negro de los carteles, el idioma por consola y `RECOMP_APU_MUTE`. **Donde este archivo diga lo contrario, vale esto:**
 
-- Ya no hay `patches/xboxrecomp.patch`. El runtime es el submódulo `third_party/xboxrecomp`, rama `pal-support` de `marianodparisi/xboxrecomp`, sobre `4df7082` de `portingpete/xboxrecomp`. Los cambios al runtime son commits en ese submódulo, y hay que subirlos antes que el commit que los fija.
+- Ya no hay `patches/xboxrecomp.patch`. El runtime es el submódulo `third_party/xboxrecomp`, rama `pal-support` de `marianodparisi/xboxrecomp`, sobre la rama `codex/hold-to-aim` de `portingpete/xboxrecomp`. Los cambios al runtime son commits en ese submódulo, y hay que subirlos antes que el commit que los fija.
 - El launcher es el de C++ (`launcher/`): `GameFiles.h` acepta los dos XBE, `GameSession.cpp` pasa `RECOMP_XBOX_LANGUAGE` y no instala bancos en PAL. El de C# ya no existe.
 - Al traer más de upstream: `pytest scripts/test_black_release.py` lista las direcciones sin envolver en `BLACK_VA` (el script de la sync las envolvió solas: 277) y los marcadores nuevos de `generate.py` van por `RELEASE.text`. Después, `verify_release.py` contra el XBE.
 

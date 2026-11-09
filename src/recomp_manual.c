@@ -178,6 +178,13 @@ static const recomp_func_t g_itrace_wrappers[ITRACE_SLOTS] = {
 extern void sub_0014EB10_gen(void);
 extern void sub_0014EBF0_gen(void);
 extern void sub_00146EA0_gen(void);
+/* The speech subtitle hooks use these before the movie wrapper's own copies below, which stay there because
+ * tests/movie_skip extracts that wrapper from its declaration onwards. Identical redeclarations. */
+static int black_pc_ram_span(uint32_t address, uint32_t bytes);
+static void black_movie_skip_font(void);
+#define GUEST32(va) (*(uint32_t *)((uintptr_t)g_xbox_mem_offset + (va)))
+#define GUEST8(va) (*(uint8_t *)((uintptr_t)g_xbox_mem_offset + (va)))
+#include "black_speech_subtitles.inc"
 
 extern void sub_000C4570_gen(void);
 
@@ -188,7 +195,6 @@ static void black_movie_skip_font(void);
 
 #define GUEST32(va) (*(uint32_t *)((uintptr_t)g_xbox_mem_offset + (va)))
 #define GUEST8(va) (*(uint8_t *)((uintptr_t)g_xbox_mem_offset + (va)))
-#include "black_speech_subtitles.inc"
 
 /* DirectSound's idle-voice completion edits the same intrusive lists as guest
  * threads at DISPATCH_LEVEL. On Xbox its busy-counter test runs on the same
@@ -560,6 +566,29 @@ int black_idle_yield_skip(void)
     static int keep = -1;
     if (keep < 0) { const char *e = getenv("RECOMP_BLACK_IDLE_YIELD"); keep = e && *e && *e != '0'; }
     return !keep && black_step_halved && black_hz >= 120;
+}
+
+/* The D3D pushbuffer wait at 0x0026CD80 polls GET until the ring has room. That
+ * is where the main thread spends a frame's spare time, about half of it at 30 Hz:
+ * spin for a moment, as a short wait ends quickly, then give the core back. */
+extern int xbox_IdleWait(unsigned int microseconds);
+
+static unsigned black_ring_spins;
+
+void black_ring_wait(void)
+{
+    if (++black_ring_spins < 200) {
+        YieldProcessor();
+        return;
+    }
+    black_ring_spins = 0;
+    if (!xbox_IdleWait(100)) YieldProcessor();
+}
+
+/* The wait is over, or was not needed (loc_0026CD8A): the next one starts with its spin, not a sleep. */
+void black_ring_wait_done(void)
+{
+    black_ring_spins = 0;
 }
 
 /* BEGIN BLACK_WEAPON_RUNTIME_MODES */

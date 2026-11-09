@@ -460,6 +460,8 @@ static void qemu_cond_wait(int *cond,int *lock)
 static void update_irq(MCPXAPUState *d) { (void)d; CHECK(locked); ++irq_publications; }
 /* PIO writers (apu_vp.c) are not part of this fixture. */
 static void mcpx_apu_pio_handoff(MCPXAPUState *d) { (void)d; }
+void mcpx_apu_pio_drain(MCPXAPUState *d);
+void mcpx_apu_pio_drain(MCPXAPUState *d) { (void)d; CHECK(locked); }
 static void throttle(MCPXAPUState *d)
 {
     CHECK(locked && initialized && !finalized); life('T');

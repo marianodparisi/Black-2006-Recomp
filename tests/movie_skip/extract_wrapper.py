@@ -33,7 +33,6 @@ def main() -> None:
     if text.count(marker) != 1:
         raise ValueError("Expected exactly one authored movie wrapper declaration")
     wrapper = text[text.index(marker):function_end(text, "void sub_000C4570(void)")]
-    wrapper = re.sub(r'#include "black_speech_subtitles\.inc"\r?\n', "", wrapper)
     font_signature = "static void black_movie_skip_font(void)"
     font_match = re.search(re.escape(font_signature) + r"\s*\{", text)
     if font_match is None:

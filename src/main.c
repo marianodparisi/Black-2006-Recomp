@@ -195,6 +195,7 @@ extern unsigned long mcpx_apu_frame_thread_id(void);
 extern void xbox_AddHangThread(unsigned long tid, const char *name);
 extern MCPXAPUState *g_apu_state;
 extern void mcpx_apu_irq_service_begin(void *opaque);
+extern int mcpx_apu_irq_service_try(void *opaque);
 extern void mcpx_apu_irq_service_end(void *opaque);
 extern bool apu_hook_handle_mmio(PCONTEXT ctx, uintptr_t fault_addr,
                                  uint32_t fault_xbox_va, int is_write);
@@ -504,6 +505,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
             xbox_SetInterruptServiceGuard(XBOX_APU_VECTOR,
                                           mcpx_apu_irq_service_begin,
                                           mcpx_apu_irq_service_end, g_apu_state);
+            xbox_SetInterruptServiceTryEnter(XBOX_APU_VECTOR, mcpx_apu_irq_service_try);
             mcpx_apu_set_irq_line(apu_irq_line);
             xbox_AddHangReport(mcpx_apu_dump_state);
             xbox_AddHangThread(mcpx_apu_frame_thread_id(), "APU frame");

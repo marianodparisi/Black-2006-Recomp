@@ -20,6 +20,13 @@ limits around where Photo Mode started.
 **Shader precompilation can be turned off.** Graphics settings have **PRECOMPILE SHADERS AT STARTUP**, on by default.
 Off starts the game sooner after a rebuild or a cleared cache, at the cost of shader hitches while playing.
 
+**Fewer audio-lock stalls.** The APU interrupt no longer waits for the audio frame
+lock at interrupt level, which removes long freezes and FPS drops on low-power CPUs.
+
+**Less CPU while waiting.** Under Wine and Proton, the main thread sleeps while it waits for pushbuffer space,
+instead of spinning for about half of each frame, and so do the GPU pusher, GPU queue and acknowledgement threads when
+idle. Windows keeps the spin until this is measured there (`RECOMP_IDLE_WAIT=1` turns it on).
+
 ## 0.1.0-alpha.5 — 2026-10-22
 
 **First C++ BLACK Launcher release on portingpete/Black-2006-Recomp.** The starter
