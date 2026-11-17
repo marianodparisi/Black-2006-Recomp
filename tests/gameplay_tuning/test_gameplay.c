@@ -120,8 +120,38 @@ static void environment(void)
     }
     fesetenv(FE_DFL_ENV);
 }
-int main(void)
+static void invulnerability(int enabled)
 {
+    unsigned flag;
+    uint8_t *snapshot = malloc(sizeof(ram));
+    CHECK(snapshot != NULL);
+    reset();
+    GUEST32(SHOOTER + 0xC4u) = 2u;
+    memcpy(snapshot, ram, sizeof(ram));
+    for (flag = 0; flag < 256u; ++flag) {
+        unsigned csr; int exceptions;
+        fesetenv(FE_DFL_ENV); fesetround(FE_UPWARD); feraiseexcept(FE_INEXACT);
+        csr = _mm_getcsr(); exceptions = fetestexcept(FE_ALL_EXCEPT);
+        CHECK(black_tuning_invulnerable(SHOOTER, flag) == (flag ? flag : (unsigned)enabled));
+        CHECK(_mm_getcsr() == csr && fegetround() == FE_UPWARD);
+        CHECK(fetestexcept(FE_ALL_EXCEPT) == exceptions);
+        CHECK(black_tuning_invulnerable(ENEMY, flag) == flag);
+        CHECK(black_tuning_invulnerable(SHOOTER + 4u, flag) == flag);
+    }
+    CHECK(!memcmp(snapshot, ram, sizeof(ram)));
+    GUEST32(SHOOTER + 0xC4u) = 1u;
+    CHECK(black_tuning_invulnerable(SHOOTER, 0u) == 0u);
+    GUEST32(0x2D45D4u) = UINT32_MAX - 16u;
+    CHECK(black_tuning_invulnerable(SHOOTER, 0u) == 0u);
+    GUEST32(0x2D45D4u) = 0u;
+    CHECK(black_tuning_invulnerable(SHOOTER, 0u) == 0u);
+    CHECK(black_tuning_invulnerable(UINT32_MAX, 0u) == 0u);
+    free(snapshot);
+    fesetenv(FE_DFL_ENV);
+}
+int main(int argc, char **argv)
+{
+    invulnerability(argc > 1 && !strcmp(argv[1], "health-on"));
     identity(); choices(); guards(); environment();
     printf("gameplay tuning: %u checks passed\n", checks);
     return 0;

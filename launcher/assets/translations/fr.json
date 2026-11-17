@@ -337,6 +337,8 @@
   "Could not create the HD pack folder: {0}": "Impossible de créer le dossier du pack HD : {0}",
   "Extract the HD pack into this folder, then select HD Pack.": "Extrayez le pack HD dans ce dossier, puis sélectionnez Pack HD.",
   "INFINITE AMMO": "MUNITIONS INFINIES",
+  "INFINITE HEALTH": "VIE INFINIE",
+  "Blocks normal player damage. Restart the game to apply.": "Bloque les dégâts normaux subis par le joueur. Redémarrez le jeu pour appliquer.",
   "Weapons never run out.": "Les armes ne sont jamais à court.",
   "SILVER WEAPONS": "ARMES ARGENTÉES",
   "The silver weapons the game unlocks on Hard. Game keeps its own rules.": "Les armes argentées que le jeu débloque en Difficile. Jeu garde ses propres règles.",

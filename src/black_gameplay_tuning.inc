@@ -14,6 +14,38 @@ static void black_tuning_settings(PcVideoSettings *settings)
     _mm_setcsr(csr);
 }
 
+/* The player's five incoming-damage handlers already honor actor+8F2.
+ * Supply that same native gate without writing the flag, health or save data.
+ * Scripted mission failure and non-player actors keep their original rules. */
+unsigned black_tuning_invulnerable(uint32_t actor, unsigned native_flag)
+{
+    static int enabled = -1, trace;
+    static unsigned traced;
+    uint32_t core;
+    unsigned result = native_flag;
+    if (enabled < 0) {
+        const char *value = getenv("RECOMP_BLACK_INFINITE_HEALTH");
+        const char *logging = getenv("RECOMP_BLACK_HEALTH_TRACE");
+        enabled = value && !strcmp(value, "1");
+        trace = logging && !strcmp(logging, "1");
+    }
+    if (!black_pc_ram_span(0x2D45D4u, 4u)) return native_flag;
+    core = GUEST32(0x2D45D4u);
+    if (!black_pc_ram_span(core, 0x930u) || actor != core + 0x30u ||
+        GUEST32(actor + 0xC4u) != 2u) return native_flag;
+    if (enabled && !native_flag) result = 1u;
+    if (trace && traced++ < 32u) {
+        fenv_t environment;
+        const unsigned csr = _mm_getcsr();
+        fegetenv(&environment);
+        fprintf(stderr, "[BLACK] player damage actor=%08X infinite-health=%d native=%u health-bits=%08X\n",
+                actor, enabled, native_flag, GUEST32(actor + 0x2F0u));
+        fesetenv(&environment);
+        _mm_setcsr(csr);
+    }
+    return result;
+}
+
 static int black_tuning_enemy(uint32_t actor, int active)
 {
     if (!black_pc_ram_span(actor, 0x3B1u) ||

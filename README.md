@@ -92,6 +92,11 @@ In **Settings > Gameplay**, or the in-game Gameplay menu:
 Combat defaults are 1X damage, 1X health and instant kills Off. Armor and the game's death/headshot tracking
 continue through the native rules. These options are independent of difficulty and optional secondary objectives.
 
+**Settings > Game > Infinite Health** optionally blocks ordinary player damage
+using the game's existing invulnerability checks. It defaults to Off; restart
+the game after changing it. It does not revive a dead player or bypass scripted
+mission failures, and enemies retain their normal damage rules.
+
 ## HD textures
 
 The game can use [BLACK HD Reimagined](#credits-and-licensing), a texture pack made by HD REIMAGINED for the PS2

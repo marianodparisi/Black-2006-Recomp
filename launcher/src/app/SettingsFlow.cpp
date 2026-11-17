@@ -513,6 +513,8 @@ std::vector<SettingsFlow::Option> SettingsFlow::gameOptions() {
                     {},
                     false});
     rows.push_back(toggle(tr("INFINITE AMMO"), tr("Weapons never run out."), s.infiniteAmmo));
+    rows.push_back(
+        toggle(tr("INFINITE HEALTH"), tr("Blocks normal player damage. Restart the game to apply."), s.infiniteHealth));
     rows.push_back({tr("SILVER WEAPONS"),
                     tr("The silver weapons the game unlocks on Hard. Game keeps its own rules."),
                     [&s] {

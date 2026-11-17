@@ -562,8 +562,23 @@ def lod_hooks(name, body):
 
 
 def gameplay_tuning_hooks(name, body):
-    """Tune native enemy health/player bullets without replacing death handling."""
+    """Tune native health, player damage gates and bullets without replacing death handling."""
     sites = {
+        "sub_001ED1E0": [
+            ("001ED1FC", "SET_LO8(l_eax, MEM8(l_esi + 0x8F2));",
+             "SET_LO8(l_eax, black_tuning_invulnerable(l_esi, MEM8(l_esi + 0x8F2)));")],
+        "sub_001ED2B0": [
+            ("001ED2B0", "SET_LO8(l_eax, MEM8(l_esi + 0x8F2));",
+             "SET_LO8(l_eax, black_tuning_invulnerable(l_esi, MEM8(l_esi + 0x8F2)));")],
+        "sub_001ED5D0": [
+            ("001ED5D0", "SET_LO8(l_ecx, MEM8(l_esi + 0x8F2));",
+             "SET_LO8(l_ecx, black_tuning_invulnerable(l_esi, MEM8(l_esi + 0x8F2)));")],
+        "sub_001ED700": [
+            ("001ED71B", "SET_LO8(l_eax, MEM8(l_edi + 0x8F2));",
+             "SET_LO8(l_eax, black_tuning_invulnerable(l_edi, MEM8(l_edi + 0x8F2)));")],
+        "sub_001ED990": [
+            ("001ED9AC", "SET_LO8(l_eax, MEM8(l_ebx + 0x8F2));",
+             "SET_LO8(l_eax, black_tuning_invulnerable(l_ebx, MEM8(l_ebx + 0x8F2)));")],
         "sub_00013E00": [
             ("00013E00", "MEMF(l_eax + 0x2F0) = xmm0.f[0]; /* movss */",
              "MEMF(l_eax + 0x2F0) = black_tuning_spawn_health(l_eax, xmm0.f[0]); /* native enemy spawn health */")],
@@ -1005,6 +1020,7 @@ def main():
     declarations += "\nextern uint32_t black_audio_queue_completion(uint32_t);\n"
     declarations += "extern float black_lod_value(float, unsigned);\nextern void black_lod_trace(uint32_t, uint32_t);\n"
     declarations += "extern float black_tuning_spawn_health(uint32_t, float);\n"
+    declarations += "extern unsigned black_tuning_invulnerable(uint32_t, unsigned);\n"
     declarations += "extern float black_tuning_bullet_damage(uint32_t, uint32_t, float);\n"
     declarations += "extern unsigned black_tuning_headshot(uint32_t, uint32_t, unsigned, unsigned);\n"
     for chunk in chunks:
