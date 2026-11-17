@@ -13,6 +13,26 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class LaunchTests(unittest.TestCase):
+    def test_build_entry_point_accepts_sh_and_preserves_arguments(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / 'BLACK spaces $ quote" percent%'
+            (root / 'scripts').mkdir(parents=True)
+            shutil.copyfile(ROOT / 'Build BLACK.sh', root / 'Build BLACK.sh')
+            record = Path(temp) / 'build-record.json'
+            (root / 'scripts/setup-linux.sh').write_text(
+                '#!/bin/bash\n'
+                'python3 - "$@" <<\'PY\'\n'
+                'import json, os, sys\nfrom pathlib import Path\n'
+                'Path(os.environ["RECORD"]).write_text(json.dumps(sys.argv[1:]))\n'
+                'PY\nexit 23\n', encoding='utf-8')
+            env = dict(os.environ, RECORD=str(record))
+            arguments = ['--game-only', 'argument with spaces', 'literal $value']
+            for shell in ['sh', 'bash']:
+                result = subprocess.run([shell, str(root / 'Build BLACK.sh'), *arguments],
+                                        cwd=temp, env=env, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 23, result.stderr)
+                self.assertEqual(json.loads(record.read_text()), arguments)
+
     @unittest.skipUnless(shutil.which('gio'), 'gio is needed to exercise desktop entry parsing')
     def test_desktop_shortcuts_escape_actual_folder(self):
         with tempfile.TemporaryDirectory() as temp:
