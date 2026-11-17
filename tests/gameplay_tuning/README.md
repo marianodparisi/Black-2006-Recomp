@@ -17,5 +17,6 @@ gate for the current player only when explicitly enabled; it never writes that
 flag or health, and native/scripted invulnerability remains authoritative when
 disabled. This does not bypass forced mission failure or revive an actor.
 
-These source tests do not establish a gameplay run under enemy fire. Real
-On/Off runs and trace logs are retained separately as runtime evidence.
+These source tests do not establish protection during gameplay. Runtime
+acceptance requires matched Off/On exposure to ordinary incoming damage;
+an attempted route that never loses health does not provide that evidence.
