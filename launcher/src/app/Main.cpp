@@ -16,6 +16,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #ifdef _WIN32
@@ -215,6 +216,17 @@ int runLauncher(std::span<const std::string> args) {
         return 0;
     }
     if (args.empty() || (args.size() == 1 && !args.front().starts_with("-"))) {
+#ifdef _WIN32
+        // The GUI uses the Vulkan loader installed by the graphics driver.
+        // Keep it loaded through Walnut teardown, including delayed calls.
+        const std::unique_ptr<std::remove_pointer_t<HMODULE>, decltype(&FreeLibrary)> vulkan(
+            LoadLibraryExW(L"vulkan-1.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32), &FreeLibrary);
+        if (!vulkan) {
+            black::app::showError("BLACK",
+                                  "The graphical launcher needs Vulkan. Install or update your graphics driver.");
+            return 1;
+        }
+#endif
         const std::unique_ptr<Walnut::Application> application(
             createApplication(start, args.empty() ? std::nullopt : std::optional(pathFromUtf8(args.front()))));
         application->Run();

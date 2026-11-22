@@ -22,7 +22,7 @@ class LauncherCliTests(unittest.TestCase):
     def cli(self, *args, success=True):
         command = [LAUNCHER, '--project-dir', self.project.name, *args]
         result = subprocess.run(command, cwd=self.cwd, capture_output=True, encoding='utf-8', timeout=10)
-        self.assertEqual(result.returncode == 0, success, (result.stdout, result.stderr))
+        self.assertEqual(result.returncode, 0 if success else 1, (result.stdout, result.stderr))
         return result
 
     def test_settings_persist_in_selected_project(self):
@@ -59,7 +59,7 @@ class LauncherCliTests(unittest.TestCase):
         self.assertFalse((self.project / 'game').exists())
         invalid = subprocess.run([LAUNCHER, '--project-dir', self.project / 'scripts', '--settings'],
                                  cwd=self.cwd, capture_output=True, timeout=10)
-        self.assertNotEqual(invalid.returncode, 0)
+        self.assertEqual(invalid.returncode, 1)
 
 
 if __name__ == '__main__':
