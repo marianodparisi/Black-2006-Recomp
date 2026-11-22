@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+**Infinite Health (optional).** Settings > Game can block ordinary player damage
+through the game's own invulnerability checks. It defaults to Off and applies
+on the next launch. Enemy damage and scripted mission failure rules are retained.
+
 **Disc reads on 4Kn drives.** Windows file buffering stays enabled for Xbox disc
 reads so 2048-byte sector requests also work on 4096-byte-sector host drives.
 

@@ -837,7 +837,6 @@ static int black_pc_ram_span(uint32_t address, uint32_t bytes)
 }
 
 #include "black_lod.inc"
-#include "black_gameplay_tuning.inc"
 
 void sub_0015A960(void)
 {
@@ -1359,6 +1358,8 @@ static uint32_t black_guest_method(uint32_t self, unsigned slot, uint32_t esi, c
 }
 
 static int black_p2_playing(void) { return black_p2_state == 2; }
+
+#include "black_gameplay_tuning.inc"
 
 /* The actor's links in the world's lists (the collision lists at core+4960 among them) belong to the one node at
  * core+30, whichever player is in it: a field whose neighbour points back at it (next or previous) when player two

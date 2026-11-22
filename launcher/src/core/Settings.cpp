@@ -389,6 +389,7 @@ std::string settingsJson(const Settings& s) {
     json["Subtitles"] = s.subtitles;
     json["SkipStartupVideos"] = s.skipStartupVideos;
     json["InfiniteAmmo"] = s.infiniteAmmo;
+    json["InfiniteHealth"] = s.infiniteHealth;
     json["SilverWeaponMode"] = s.silverWeaponMode;
     json["Textures"] = s.textures;
     json["MenuLanguage"] = s.menuLanguage;
@@ -456,6 +457,7 @@ Settings settingsFromJson(std::string_view text) {
     readField(json, json.contains("SkipStartupVideos") ? "SkipStartupVideos" : "AdvanceMenus", s.skipStartupVideos,
               kAny);
     readField(json, "InfiniteAmmo", s.infiniteAmmo, kAny);
+    readField(json, "InfiniteHealth", s.infiniteHealth, kAny);
     readField(json, "SilverWeaponMode", s.silverWeaponMode, among(choices::kSilverWeapons));
     readField(json, "Textures", s.textures, among(choices::kTextures));
     if (!json.contains("SilverWeaponMode") && json.value("SilverWeapons", false)) {

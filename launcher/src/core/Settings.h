@@ -24,6 +24,7 @@ struct Settings {
     bool subtitles = true;
     bool skipStartupVideos = false;
     bool infiniteAmmo = false;
+    bool infiniteHealth = false;
     std::string silverWeaponMode = "native";  // native, force-on, force-off
     std::string textures = "original";        // original, hd-pack (the texture_pack_hd folder)
     std::string menuLanguage = "en-US";
