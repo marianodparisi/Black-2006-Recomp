@@ -297,6 +297,7 @@ std::map<std::string, std::string> gameEnvironment(const ProjectLayout& project,
     if (settings.infiniteAmmo) {
         env["RECOMP_BLACK_INFINITE_AMMO"] = "1";
     }
+    env["RECOMP_BLACK_INFINITE_HEALTH"] = settings.infiniteHealth ? "1" : "0";
     if (settings.textures == "hd-pack" && fs::is_directory(project.root() / "texture_pack_hd")) {
         env["RECOMP_TEXTURE_PACK"] = gamePath(project.root() / "texture_pack_hd", style);  // replacement textures
         const fs::path map =

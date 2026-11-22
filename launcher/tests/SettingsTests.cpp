@@ -35,6 +35,19 @@ TEST_CASE("Startup video skipping migrates menu automation and respects explicit
     }
 }
 
+TEST_CASE("Infinite health defaults off and preserves only explicit boolean preferences") {
+    CHECK_FALSE(defaultSettings().infiniteHealth);
+    CHECK_FALSE(settingsFromJson("{}").infiniteHealth);
+    CHECK_FALSE(settingsFromJson(R"({"InfiniteHealth":"true"})").infiniteHealth);
+    CHECK_FALSE(settingsFromJson(R"({"InfiniteHealth":1})").infiniteHealth);
+    for (const bool enabled : {false, true}) {
+        Settings settings;
+        settings.infiniteHealth = enabled;
+        CHECK(settingsFromJson(settingsJson(settings)).infiniteHealth == enabled);
+        CHECK_FALSE(settingsFromJson(settingsJson(settings)).infiniteAmmo);
+    }
+}
+
 TEST_CASE("Gameplay additions default off and preserve explicit independent choices") {
     const Settings defaults = defaultSettings();
     CHECK(defaults.crosshair == "original");
