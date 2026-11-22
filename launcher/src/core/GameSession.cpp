@@ -252,7 +252,7 @@ struct GameSession::Lock {
 };
 
 std::map<std::string, std::string> gameEnvironment(const ProjectLayout& project, const Settings& settings,
-                                                   PathStyle style) {
+                                                   PathStyle style, bool fullscreen) {
     std::map<std::string, std::string> env = {
         {"RECOMP_AC97_READY", "1"},
         {"RECOMP_APU_DSP_ACK", "0x83218810"},
@@ -272,6 +272,9 @@ std::map<std::string, std::string> gameEnvironment(const ProjectLayout& project,
         {"RECOMP_BLACK_MOUSE_SENSITIVITY", shortest(settings.mouseSensitivity)},
         {"RECOMP_BLACK_MOUSE_INVERT_Y", settings.invertY ? "1" : "0"},
     };
+    if (fullscreen) {
+        env["RECOMP_WINDOW_MODE"] = "borderless";
+    }
     if (settings.gpuRenderer) {
         env["RECOMP_KELVIN_GPU"] = "1";
         env["RECOMP_KGPU_CACHE"] = gamePath(project.localDirectory() / "kgpu-cache", style);  // compiled shaders
@@ -350,7 +353,8 @@ std::optional<std::string> texturePackProblem(const ProjectLayout& project, cons
     return std::nullopt;
 }
 
-Result<std::unique_ptr<GameSession>> GameSession::start(const ProjectLayout& project, const Settings& settings) {
+Result<std::unique_ptr<GameSession>> GameSession::start(const ProjectLayout& project, const Settings& settings,
+                                                        bool fullscreen) {
     const auto executable = checkReadyToPlay(project);
     if (!executable) {
         return executable.error();
@@ -419,7 +423,7 @@ Result<std::unique_ptr<GameSession>> GameSession::start(const ProjectLayout& pro
     }
     fs::copy_file(video, folder / "video.ini", fs::copy_options::overwrite_existing, error);
 
-    std::map<std::string, std::string> environment = gameEnvironment(project, settings, style);
+    std::map<std::string, std::string> environment = gameEnvironment(project, settings, style, fullscreen);
     const auto exeHash = sha256File(executable.value());
     const bool drawLog = !settings.kgpuDrawLogFrames.empty();
     Json launch;

@@ -70,6 +70,11 @@ class LaunchTests(unittest.TestCase):
                 result = json.loads(record.read_text())
                 self.assertEqual(result['args'], args)
                 self.assertEqual(result['cwd'], str(root))
+            for script, options, expected in [
+                    ('Play BLACK.sh', ['--fullscreen'], ['--play', '--fullscreen']),
+                    ('BLACK Settings.sh', ['--import', 'My disc.iso'], ['--import', 'My disc.iso'])]:
+                subprocess.run(['bash', str(root / script), *options], cwd=temp, env=env, check=True)
+                self.assertEqual(json.loads(record.read_text()), {'args': expected, 'cwd': temp})
 
     def test_a_missing_launcher_is_reported(self):
         with tempfile.TemporaryDirectory() as temp:

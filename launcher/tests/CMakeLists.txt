@@ -36,3 +36,9 @@ target_include_directories(black_launcher_settings_tests PRIVATE "${CMAKE_CURREN
 target_link_libraries(black_launcher_settings_tests PRIVATE black_launcher_core black_walnut black_json)
 black_launcher_warnings(black_launcher_settings_tests)
 add_test(NAME black_launcher_settings_tests COMMAND black_launcher_settings_tests)
+
+find_package(Python3 QUIET COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME black_launcher_cli
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_cli.py" "$<TARGET_FILE:black_launcher>")
+endif()

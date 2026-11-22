@@ -24,7 +24,7 @@ enum class PathStyle { Native, Wine };
 /// The RECOMP_* variables the game reads. Video and controls settings are not among them: the game reads
 /// local/video.ini and local/controls.ini, which its own settings pages also edit.
 [[nodiscard]] std::map<std::string, std::string> gameEnvironment(const ProjectLayout& project, const Settings& settings,
-                                                                 PathStyle style);
+                                                                 PathStyle style, bool fullscreen = false);
 
 /// The game executable, once the build and the disc files are both in place.
 [[nodiscard]] Result<std::filesystem::path> checkReadyToPlay(const ProjectLayout& project);
@@ -36,7 +36,7 @@ enum class PathStyle { Native, Wine };
 class GameSession {
 public:
     [[nodiscard]] static Result<std::unique_ptr<GameSession>> start(const ProjectLayout& project,
-                                                                    const Settings& settings);
+                                                                    const Settings& settings, bool fullscreen = false);
 
     GameSession(const GameSession&) = delete;
     GameSession& operator=(const GameSession&) = delete;

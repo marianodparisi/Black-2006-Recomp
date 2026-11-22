@@ -515,6 +515,37 @@ Settings settingsFromJson(std::string_view text) {
     return s;
 }
 
+Result<Settings> withSettingAssignments(const Settings& saved, std::span<const std::string> assignments) {
+    // Compare binding maps by key, independent of the order used on the command line.
+    using Values = nlohmann::json;
+    Values requested = Values::parse(settingsJson(saved));
+    for (const auto& assignment : assignments) {
+        const auto equals = assignment.find('=');
+        const auto key = assignment.substr(0, equals);
+        if (equals == std::string::npos || key == "SettingsVersion" || !requested.contains(key)) {
+            return Error{"Expected a setting from --settings in the form Name=value: " + assignment};
+        }
+        const auto value = assignment.substr(equals + 1);
+        auto& field = requested[key];
+        Values parsed = field.is_string() ? Values(value) : Values::parse(value, nullptr, false);
+        if (parsed.is_discarded() || (field.is_number_integer() && !parsed.is_number_integer())) {
+            return Error{"Invalid value for " + key};
+        }
+        field = std::move(parsed);
+        // The existing settings reader validates types, ranges, enum choices and binding names.
+        // A rejected field falls back to its default. Reject that substitution on the command line.
+        const Settings checked = settingsFromJson(requested.dump());
+        if (Values::parse(settingsJson(checked)).at(key) != field) {
+            return Error{"Invalid value for " + key};
+        }
+    }
+    Settings settings = settingsFromJson(requested.dump());
+    if (const auto problem = settingsProblem(settings)) {
+        return Error{*problem};
+    }
+    return settings;
+}
+
 Settings loadSettings(const ProjectLayout& project) {
     const std::filesystem::path local = project.localDirectory();
     Settings settings = defaultSettings();

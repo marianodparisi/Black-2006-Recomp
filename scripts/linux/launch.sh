@@ -13,9 +13,13 @@ fail() {
 launcher="$release_root/BLACK Launcher"
 [[ -x "$launcher" ]] || fail 'The launcher is missing. Run Build BLACK.sh, or extract the entire release folder.'
 [[ $(uname -m) == x86_64 ]] || fail 'This release requires an x86_64 Linux system with an AVX2 CPU.'
-cd -- "$release_root"
-case "${1:-play}" in
-    play) exec "$launcher" --play ;;
-    settings) exec "$launcher" ;;
+action=${1:-play}
+if (( $# )); then shift; fi
+# Desktop shortcuts start inside the release. Explicit arguments can contain
+# paths relative to the calling terminal, so retain its directory for those.
+if (( $# == 0 )); then cd -- "$release_root"; fi
+case "$action" in
+    play) exec "$launcher" --play "$@" ;;
+    settings) exec "$launcher" "$@" ;;
     *) fail 'Expected play or settings.' ;;
 esac

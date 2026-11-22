@@ -20,6 +20,8 @@ TEST_CASE("The game environment follows the settings") {
     CHECK(env.at("RECOMP_BLACK_MOUSE_SENSITIVITY") == "1.25");
     CHECK(env.at("RECOMP_BLACK_BIND_FIRE") == "Mouse2");
     CHECK(env.at("RECOMP_BLACK_BIND_CROUCH") == "LCtrl,C");
+    CHECK_FALSE(env.contains("RECOMP_WINDOW_MODE"));
+    CHECK(gameEnvironment(project, settings, PathStyle::Native, true).at("RECOMP_WINDOW_MODE") == "borderless");
     CHECK(env.at("RECOMP_LANGUAGE") == "en-US");
     CHECK_FALSE(env.contains("RECOMP_BLACK_HZ"));
     CHECK_FALSE(env.contains("RECOMP_KELVIN_ASSIST_QUEUE"));

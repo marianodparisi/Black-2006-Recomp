@@ -31,6 +31,43 @@ damage, enemy spawn health and instant-kill headshots, shared with the in-game
 menus through `local/video.ini`. HD texture setup can create/open the fixed
 `texture_pack_hd` folder and reports a missing folder before launching.
 
+## Command line
+
+Use **BLACK Launcher.exe** on Windows or **BLACK Launcher** on Linux. Run
+`--help` for the command list. With no arguments the launcher opens its menu.
+A disc path on its own opens the graphical disc review.
+
+From the extracted Linux starter, a frontend can run the following sequence.
+On Windows, use the same arguments with `BLACK Launcher.exe`.
+
+```sh
+./'BLACK Launcher' --import '/media/discs/BLACK.iso'
+./'BLACK Launcher' --build
+./'BLACK Launcher' --settings
+./'BLACK Launcher' --set FpsLimit=60 VSync=true MenuLanguage=en-US
+./'BLACK Launcher' --play --fullscreen --no-dialogs
+```
+
+`--import` accepts an ISO/XISO or extracted disc directory, verifies the
+supported XBE, and resumes an interrupted copy into `game/`. Once built,
+later launches only need `--play`. It waits for the game and returns its exit
+code. `--no-dialogs` sends launch errors to stderr. `--fullscreen` selects
+borderless fullscreen for that session and preserves the saved window mode.
+
+`--set` saves one or more assignments using the case-sensitive names printed
+by `--settings`. Pass strings as plain text, booleans as `true` or `false`, and
+numbers in decimal. `Bindings` accepts a JSON object of keyboard overrides.
+The launcher validates the whole batch before saving. `SettingsVersion` is
+read-only.
+
+The default project is the starter beside the executable, or the source tree
+containing a development build. To select another extracted starter, put
+`--project-dir DIRECTORY` before the command. This selects the build sources,
+disc, build outputs, settings, saves and reports together. Relative disc paths
+are resolved from the calling directory. On Linux the launcher uses the
+project's private Wine or Proton prefix by default. System compilers, graphics
+drivers and Wine are host dependencies.
+
 ## Building
 
 Starter archives include the compiled launcher and its license notices. To build
