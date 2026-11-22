@@ -6,7 +6,8 @@ or Debug, and run CTest for that configuration.
 
 Infinite-health cases launch independent processes with the option Off, On and
 invalid. They check all native gate-byte values, current-player identity and
-type, bad pointers, unchanged guest RAM, and host floating-point state including
+type, the active split-screen shadow actor, stale shadow addresses, bad pointers,
+unchanged guest RAM, and host floating-point state including
 the diagnostic path. Generator guards reject missing, moved, changed or duplicate
 instructions and verify repeat application is idempotent.
 

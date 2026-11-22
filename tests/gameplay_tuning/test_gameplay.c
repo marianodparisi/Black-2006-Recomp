@@ -24,6 +24,12 @@ void pc_video_get(PcVideoSettings *out)
         _mm_setcsr(0x3F81u);
     }
 }
+#define BLACK_ACTOR_AT 0x30u
+#define BLACK_ACTOR_BYTES 0x900u
+static uint32_t black_p2_shadow, black_p2_core;
+static int split_enabled, p2_playing;
+static int pc_split_enabled(void) { return split_enabled; }
+static int black_p2_playing(void) { return p2_playing; }
 #include "../../src/black_gameplay_tuning.inc"
 static unsigned checks;
 #define CHECK(x) do { ++checks; if (!(x)) { fprintf(stderr, "line %d: %s\n", __LINE__, #x); exit(1); } } while (0)
@@ -39,6 +45,8 @@ static void reset(void)
     GUEST32(ENEMY + 0xC4) = 1u;
     GUEST32(ENEMY + 0x324) = 0x40000u;
     GUEST32(0x2D45D4) = CORE;
+    black_p2_core = black_p2_shadow = 0u;
+    p2_playing = split_enabled = 0;
 }
 static void identity(void)
 {
@@ -127,18 +135,36 @@ static void invulnerability(int enabled)
     CHECK(snapshot != NULL);
     reset();
     GUEST32(SHOOTER + 0xC4u) = 2u;
+    black_p2_core = CORE;
+    black_p2_shadow = 0x40000u;
+    GUEST32(black_p2_shadow + 0xC4u) = 2u;
+    p2_playing = split_enabled = 1;
     memcpy(snapshot, ram, sizeof(ram));
     for (flag = 0; flag < 256u; ++flag) {
         unsigned csr; int exceptions;
         fesetenv(FE_DFL_ENV); fesetround(FE_UPWARD); feraiseexcept(FE_INEXACT);
         csr = _mm_getcsr(); exceptions = fetestexcept(FE_ALL_EXCEPT);
         CHECK(black_tuning_invulnerable(SHOOTER, flag) == (flag ? flag : (unsigned)enabled));
+        CHECK(black_tuning_invulnerable(black_p2_shadow, flag) == (flag ? flag : (unsigned)enabled));
         CHECK(_mm_getcsr() == csr && fegetround() == FE_UPWARD);
         CHECK(fetestexcept(FE_ALL_EXCEPT) == exceptions);
         CHECK(black_tuning_invulnerable(ENEMY, flag) == flag);
         CHECK(black_tuning_invulnerable(SHOOTER + 4u, flag) == flag);
     }
     CHECK(!memcmp(snapshot, ram, sizeof(ram)));
+    split_enabled = 0;
+    CHECK(black_tuning_invulnerable(black_p2_shadow, 0u) == 0u);
+    split_enabled = 1;
+    p2_playing = 0;
+    CHECK(black_tuning_invulnerable(black_p2_shadow, 0u) == 0u);
+    p2_playing = 1;
+    black_p2_core += 4u;
+    CHECK(black_tuning_invulnerable(black_p2_shadow, 0u) == 0u);
+    black_p2_core = CORE;
+    GUEST32(black_p2_shadow + 0xC4u) = 1u;
+    CHECK(black_tuning_invulnerable(black_p2_shadow, 0u) == 0u);
+    black_p2_shadow = UINT32_MAX;
+    CHECK(black_tuning_invulnerable(black_p2_shadow, 0u) == 0u);
     GUEST32(SHOOTER + 0xC4u) = 1u;
     CHECK(black_tuning_invulnerable(SHOOTER, 0u) == 0u);
     GUEST32(0x2D45D4u) = UINT32_MAX - 16u;

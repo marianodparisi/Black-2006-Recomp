@@ -31,8 +31,13 @@ unsigned black_tuning_invulnerable(uint32_t actor, unsigned native_flag)
     }
     if (!black_pc_ram_span(0x2D45D4u, 4u)) return native_flag;
     core = GUEST32(0x2D45D4u);
-    if (!black_pc_ram_span(core, 0x930u) || actor != core + 0x30u ||
-        GUEST32(actor + 0xC4u) != 2u) return native_flag;
+    if (!black_pc_ram_span(core, BLACK_ACTOR_AT + BLACK_ACTOR_BYTES)) return native_flag;
+    /* Between split-screen updates, physics and AI can deliver the hit to the
+     * shadow actor. Its allocation is reused across missions. */
+    if (actor != core + BLACK_ACTOR_AT &&
+        (actor != black_p2_shadow || core != black_p2_core || !black_p2_playing() ||
+         !pc_split_enabled() || !black_pc_ram_span(actor, BLACK_ACTOR_BYTES))) return native_flag;
+    if (GUEST32(actor + 0xC4u) != 2u) return native_flag;
     if (enabled && !native_flag) result = 1u;
     if (trace && traced++ < 32u) {
         fenv_t environment;
