@@ -10,6 +10,7 @@
 
 #include "Walnut/Application.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <filesystem>
 #include <memory>
@@ -20,9 +21,12 @@
 #include <vector>
 
 #ifdef _WIN32
+#include <io.h>
 #include <windows.h>
 // after windows.h
 #include <shellapi.h>
+#elif defined(__linux__)
+#include <sys/auxv.h>
 #endif
 
 // Walnut's Application clears this when closed; its EntryPoint.h would define it, but the launcher has its own main()
@@ -68,6 +72,17 @@ std::filesystem::path searchStart() {
     const std::filesystem::path executable(buffer);
 #else
     std::error_code error;
+#ifdef __linux__
+    // The kernel retains the invoked path (including a launcher symlink and PATH lookup).
+    // Locate the project from its parent before resolving the executable itself.
+    const auto* invoked = reinterpret_cast<const char*>(getauxval(AT_EXECFN));  // NOLINT
+    if (invoked != nullptr && *invoked != '\0') {
+        const auto path = std::filesystem::absolute(invoked, error);
+        if (!error && black::core::ProjectLayout::locate(path.parent_path())) {
+            return path.parent_path();
+        }
+    }
+#endif
     const auto executable = std::filesystem::read_symlink("/proc/self/exe", error);
 #endif
     if (!executable.empty() && black::core::ProjectLayout::locate(executable.parent_path())) {
@@ -75,6 +90,29 @@ std::filesystem::path searchStart() {
     }
     return std::filesystem::current_path();
 }
+
+#ifdef _WIN32
+void attachCliConsole() {
+    // A GUI-subsystem process starts without CRT streams when called directly
+    // from a terminal. Keep any pipes or files that the caller supplied.
+    const auto missing = [](FILE* stream) {
+        const int fd = _fileno(stream);
+        return fd < 0 || _get_osfhandle(fd) == -1;
+    };
+    const bool needOut = missing(stdout);
+    const bool needErr = missing(stderr);
+    if ((!needOut && !needErr) || (!AttachConsole(ATTACH_PARENT_PROCESS) && GetLastError() != ERROR_ACCESS_DENIED)) {
+        return;
+    }
+    FILE* console = nullptr;
+    if (needOut) {
+        freopen_s(&console, "CONOUT$", "w", stdout);
+    }
+    if (needErr) {
+        freopen_s(&console, "CONOUT$", "w", stderr);
+    }
+}
+#endif
 
 /// --play: starts the game with the saved settings and no launcher window, and waits for it (the logs need the
 /// launcher until the game ends). Returns the game's exit code.
@@ -183,13 +221,18 @@ int fail(const std::string& message) {
     return 1;
 }
 
+int missingProject(std::span<const std::string> args, const std::string& message) {
+    if (!args.empty() && args.front() == "--play" && std::ranges::find(args, "--no-dialogs") == args.end()) {
+        black::app::showError("BLACK", message);
+        return 1;
+    }
+    return fail(message);
+}
+
 int importWithoutWindow(const black::core::ProjectLayout& project, const std::string& path) {
     const auto source = black::core::inspectDiscSource(black::core::pathFromUtf8(path));
     if (!source) {
         return fail(source.error().message);
-    }
-    if (source.value().release.state != black::core::GameFilesState::Supported) {
-        return fail("This disc does not contain the supported Xbox release of BLACK.");
     }
     const auto result = black::core::importDisc(source.value(), project.gameDirectory(), {}, {});
     if (!result) {
@@ -201,13 +244,22 @@ int importWithoutWindow(const black::core::ProjectLayout& project, const std::st
 
 int runLauncher(std::span<const std::string> args) {
     using namespace black::core;
+#ifdef _WIN32
+    if (!args.empty() && args.front().starts_with("-")) {
+        attachCliConsole();
+    }
+#endif
     std::filesystem::path start;
     if (!args.empty() && args.front() == "--project-dir") {
-        if (args.size() < 2 || args[1].empty() || !ProjectLayout::isProjectRoot(pathFromUtf8(args[1]))) {
+        if (args.size() < 2) {
             return fail("--project-dir needs the directory containing the extracted BLACK starter or source tree.");
         }
         start = pathFromUtf8(args[1]);
         args = args.subspan(2);
+        if (start.empty() || !ProjectLayout::isProjectRoot(start)) {
+            return missingProject(
+                args, "--project-dir needs the directory containing the extracted BLACK starter or source tree.");
+        }
     } else {
         start = searchStart();
     }
@@ -234,7 +286,7 @@ int runLauncher(std::span<const std::string> args) {
     }
     const auto project = ProjectLayout::locate(start);
     if (!project) {
-        return fail("Cannot find the BLACK project. Use --project-dir DIRECTORY.");
+        return missingProject(args, "Cannot find the BLACK project. Use --project-dir DIRECTORY.");
     }
     const auto& command = args.front();
     const auto options = args.subspan(1);
@@ -263,11 +315,7 @@ int runLauncher(std::span<const std::string> args) {
         return 0;
     }
     if (command == "--set" && !options.empty()) {
-        const auto settings = withSettingAssignments(loadSettings(*project), options);
-        if (!settings) {
-            return fail(settings.error().message);
-        }
-        const auto saved = saveSettings(*project, settings.value());
+        const auto saved = updateSettings(*project, options);
         return saved ? 0 : fail(saved.error().message);
     }
     return fail(kUsage);

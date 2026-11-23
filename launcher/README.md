@@ -48,8 +48,9 @@ On Windows, use the same arguments with `BLACK Launcher.exe`.
 ./'BLACK Launcher' --play --fullscreen --no-dialogs
 ```
 
-`--import` accepts an ISO/XISO or extracted disc directory, verifies the
-supported XBE, and resumes an interrupted copy into `game/`. Once built,
+`--import` accepts an ISO/XISO or extracted disc directory. It checks the
+supported XBE and the required `GlobData.bin`, `levels/`, `sound/`, and `videos/`
+entries before copying. Rerunning the command resumes the copy into `game/`. Once built,
 later launches only need `--play`. It waits for the game and returns its exit
 code. `--no-dialogs` sends launch errors to stderr. `--fullscreen` selects
 borderless fullscreen for that session and preserves the saved window mode.
@@ -57,7 +58,9 @@ borderless fullscreen for that session and preserves the saved window mode.
 `--set` saves one or more assignments using the case-sensitive names printed
 by `--settings`. Pass strings as plain text, booleans as `true` or `false`, and
 numbers in decimal. `Bindings` accepts a JSON object of keyboard overrides.
-The launcher validates the whole batch before saving. `SettingsVersion` is
+The launcher serializes simultaneous `--set` commands for the same project and
+validates the whole batch before saving. To restore a binding, include its
+default keys in the bindings object. `SettingsVersion` is
 read-only.
 
 The default project is the starter beside the executable, or the source tree
@@ -65,7 +68,8 @@ containing a development build. To select another extracted starter, put
 `--project-dir DIRECTORY` before the command. This selects the build sources,
 disc, build outputs, settings, saves and reports together. Relative disc paths
 are resolved from the calling directory. On Linux the launcher uses the
-project's private Wine or Proton prefix by default. System compilers, graphics
+project's private Wine or Proton prefix by default. The play shortcut also accepts
+`./'Play BLACK.sh' --project-dir DIRECTORY --no-dialogs`. System compilers, graphics
 drivers and Wine are host dependencies.
 
 ## Building

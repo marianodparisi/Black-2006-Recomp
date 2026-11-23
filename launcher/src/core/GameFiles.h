@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -24,5 +25,14 @@ struct GameFilesStatus {
 };
 
 [[nodiscard]] GameFilesStatus inspectGameFiles(const std::filesystem::path& defaultXbe);
+
+struct RequiredDiscEntry {
+    std::string_view name;
+    bool directory;
+};
+inline constexpr std::array<RequiredDiscEntry, 4> kRequiredDiscData = {
+    {{"GlobData.bin", false}, {"levels", true}, {"sound", true}, {"videos", true}}};
+/// The first missing data entry, or an empty view if the installed layout is ready.
+[[nodiscard]] std::string_view missingDiscData(const std::filesystem::path& gameDirectory);
 
 }  // namespace black::core

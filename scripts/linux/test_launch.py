@@ -72,6 +72,8 @@ class LaunchTests(unittest.TestCase):
                 self.assertEqual(result['cwd'], str(root))
             for script, options, expected in [
                     ('Play BLACK.sh', ['--fullscreen'], ['--play', '--fullscreen']),
+                    ('Play BLACK.sh', ['--project-dir', 'Another starter', '--no-dialogs', '--fullscreen'],
+                     ['--project-dir', 'Another starter', '--play', '--no-dialogs', '--fullscreen']),
                     ('BLACK Settings.sh', ['--import', 'My disc.iso'], ['--import', 'My disc.iso'])]:
                 subprocess.run(['bash', str(root / script), *options], cwd=temp, env=env, check=True)
                 self.assertEqual(json.loads(record.read_text()), {'args': expected, 'cwd': temp})
@@ -82,10 +84,28 @@ class LaunchTests(unittest.TestCase):
             (root / 'scripts/linux').mkdir(parents=True)
             for name in ['Play BLACK.sh', 'scripts/linux/launch.sh']:
                 shutil.copyfile(ROOT / name, root / name)
-            result = subprocess.run(['bash', str(root / 'Play BLACK.sh')], capture_output=True, text=True,
-                                    env=dict(os.environ, PATH='/usr/bin:/bin'))
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn('launcher is missing', result.stderr)
+            fake_dialog = root / 'zenity'
+            fake_dialog.write_text('#!/bin/sh\ntouch "$DIALOG_RECORD"\n')
+            fake_dialog.chmod(0o755)
+            record = root / 'dialog'
+            env = dict(os.environ, PATH=f'{root}:/usr/bin:/bin', DIALOG_RECORD=str(record))
+            def launch(*args):
+                return subprocess.run(['bash', str(root / 'Play BLACK.sh'), *args], env=env,
+                                      capture_output=True, text=True, timeout=5)
+            for options in [('--no-dialogs',), ()]:
+                result = launch(*options)
+                self.assertEqual(result.returncode, 1)
+                self.assertIn('launcher is missing', result.stderr)
+                self.assertEqual(record.exists(), not options)
+            record.unlink()
+            (root / 'BLACK Launcher').touch(mode=0o755)
+            uname = root / 'uname'
+            uname.write_text('#!/bin/sh\necho aarch64\n')
+            uname.chmod(0o755)
+            result = launch('--no-dialogs')
+            self.assertEqual(result.returncode, 1)
+            self.assertIn('x86_64', result.stderr)
+            self.assertFalse(record.exists())
 
 
 if __name__ == '__main__':

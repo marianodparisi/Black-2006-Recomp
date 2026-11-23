@@ -25,4 +25,16 @@ GameFilesStatus inspectGameFiles(const std::filesystem::path& defaultXbe) {
     return status;
 }
 
+std::string_view missingDiscData(const std::filesystem::path& gameDirectory) {
+    for (const auto& entry : kRequiredDiscData) {
+        std::error_code error;
+        const auto status = std::filesystem::status(gameDirectory / entry.name, error);
+        if (error ||
+            !(entry.directory ? std::filesystem::is_directory(status) : std::filesystem::is_regular_file(status))) {
+            return entry.name;
+        }
+    }
+    return {};
+}
+
 }  // namespace black::core

@@ -16,6 +16,7 @@
 namespace black::core {
 
 class ChildProcess;
+class ProjectLock;
 class TraceLog;
 
 /// How the game sees a host path: as is on Windows; under Wine, the Unix path on drive Z:.
@@ -56,15 +57,13 @@ public:
     void stop();
     int wait();
 
-    struct Lock;
-
 private:
     GameSession() = default;
     void writeLine(std::string_view line, bool isError);
     void finish(const ProjectLayout& project);
 
     std::filesystem::path m_directory;
-    std::unique_ptr<Lock> m_lock;
+    std::unique_ptr<ProjectLock> m_lock;
     std::unique_ptr<TraceLog> m_log;
     std::unique_ptr<TraceLog> m_visualTrace;
     std::unique_ptr<TraceLog> m_dspTrace;

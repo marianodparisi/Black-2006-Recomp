@@ -126,8 +126,6 @@ int applyVideoIni(Settings& settings, std::string_view text);
 [[nodiscard]] std::string settingsJson(const Settings& settings);
 /// Fields of the wrong type or out of range keep their defaults; older files gain the new fields.
 [[nodiscard]] Settings settingsFromJson(std::string_view json);
-/// Apply named launcher settings as a batch. Invalid names, types and values produce an error.
-[[nodiscard]] Result<Settings> withSettingAssignments(const Settings& saved, std::span<const std::string> assignments);
 
 /// "120", "120-180" or "120-240/30", normalized; nothing when invalid.
 [[nodiscard]] std::optional<std::string> normalizeTraceFrames(std::string_view value);
@@ -136,5 +134,7 @@ int applyVideoIni(Settings& settings, std::string_view text);
 
 [[nodiscard]] Settings loadSettings(const ProjectLayout& project);
 [[nodiscard]] Result<bool> saveSettings(const ProjectLayout& project, const Settings& settings);
+/// Read, validate and save one batch while holding the project's settings lock.
+[[nodiscard]] Result<bool> updateSettings(const ProjectLayout& project, std::span<const std::string> assignments);
 
 }  // namespace black::core
