@@ -14,6 +14,7 @@ add_library(black_launcher_core STATIC
     Process.cpp
     Profile.cpp
     ProjectLayout.cpp
+    ProjectLock.cpp
     Settings.cpp
     Sha1.cpp
     Sha256.cpp

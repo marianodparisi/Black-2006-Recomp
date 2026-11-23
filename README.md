@@ -64,6 +64,12 @@ and drawn like the game's own menu pages, with the game's menu fonts once your d
 
 See [launcher/README.md](launcher/README.md) to build or change it.
 
+For a frontend or unattended setup, the same executable accepts `--import`
+with a disc image or folder, `--build`, and `--play --no-dialogs`.
+Use `--play --fullscreen` for borderless fullscreen on one launch.
+`--settings` prints the available setting names and their current values.
+See the [launcher command line](launcher/README.md#command-line) for examples.
+
 | Main menu | Your disc |
 | --- | --- |
 | ![Main menu](docs/images/launcher-main.png) | ![Choosing a disc](docs/images/launcher-disc.png) |

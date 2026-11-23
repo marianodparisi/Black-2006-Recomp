@@ -23,6 +23,14 @@ LINUX (x86_64)
 3. Open BLACK Settings.sh, choose Your disc, then Build the game, then Play.
    Play BLACK.sh starts the game later. Install Linux Shortcuts.sh is optional.
 
+COMMAND LINE
+Use the same launcher with --help to list commands. A frontend can run --import
+with a disc image or folder, then --build. Later use --play --no-dialogs to
+launch and wait for the game's exit code. Add --fullscreen for borderless
+fullscreen on one run. Use --settings to read settings and --set FpsLimit=60
+to save a change. Put --project-dir DIRECTORY before the command to select a
+different extracted starter.
+
 OPTIONAL SETTINGS AND STEAM
 After building, close Steam, choose Add to Steam in the launcher, select your
 account and confirm. Restart Steam. Keep BLACK in the same installation folder.

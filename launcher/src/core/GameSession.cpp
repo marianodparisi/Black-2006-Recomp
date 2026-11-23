@@ -3,6 +3,7 @@
 #include "core/ChildProcess.h"
 #include "core/GameFiles.h"
 #include "core/LanguageBanks.h"
+#include "core/ProjectLock.h"
 #include "core/Sha256.h"
 #include "core/Text.h"
 #include "core/TraceLog.h"
@@ -18,7 +19,6 @@
 #include <ctime>
 #include <fstream>
 #include <random>
-#include <span>
 
 #ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
@@ -30,10 +30,6 @@
 #include <windows.h>
 // after windows.h, which it depends on
 #include <tlhelp32.h>
-#else
-#include <fcntl.h>
-#include <sys/file.h>
-#include <unistd.h>
 #endif
 
 namespace black::core {
@@ -97,20 +93,6 @@ std::string randomHex8() {
 }
 
 #ifdef _WIN32
-/// Upper-case hex SHA-256 of the project folder, naming its lock so two copies of the project do not block each
-/// other.
-std::string projectIdentity(const ProjectLayout& project) {
-    std::string root = toUtf8(fs::absolute(project.root()));
-    while (!root.empty() && (root.back() == '/' || root.back() == '\\')) {
-        root.pop_back();
-    }
-    std::transform(root.begin(), root.end(), root.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
-    Sha256 hash;
-    hash.update(std::as_bytes(std::span(root)));
-    return Sha256::toHex(hash.finish());
-}
-
 /// A copy of this project's game already running, started from anywhere: its process id, or 0.
 unsigned long runningGame(const fs::path& executable) {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
@@ -202,57 +184,8 @@ Result<bool> writeText(const fs::path& path, std::string_view text) {
 
 }  // namespace
 
-struct GameSession::Lock {
-#ifdef _WIN32
-    HANDLE mutex = nullptr;
-    ~Lock() {
-        if (mutex != nullptr) {
-            ReleaseMutex(mutex);
-            CloseHandle(mutex);
-        }
-    }
-#else
-    int file = -1;
-    ~Lock() {
-        if (file >= 0) {
-            close(file);
-        }
-    }
-#endif
-    Lock() = default;
-    Lock(const Lock&) = delete;
-    Lock& operator=(const Lock&) = delete;
-    Lock(Lock&&) = delete;
-    Lock& operator=(Lock&&) = delete;
-
-    [[nodiscard]] static std::unique_ptr<Lock> acquire(const ProjectLayout& project) {
-        auto lock = std::make_unique<Lock>();
-#ifdef _WIN32
-        const std::wstring name = L"Local\\BlackXboxGame-" + pathFromUtf8(projectIdentity(project)).wstring();
-        lock->mutex = CreateMutexW(nullptr, FALSE, name.c_str());
-        if (lock->mutex == nullptr) {
-            return nullptr;
-        }
-        const DWORD state = WaitForSingleObject(lock->mutex, 0);
-        if (state != WAIT_OBJECT_0 && state != WAIT_ABANDONED) {
-            return nullptr;
-        }
-#else
-        std::error_code error;
-        fs::create_directories(project.localDirectory(), error);
-        const std::string path = (project.localDirectory() / ".game.lock").string();
-        lock->file =
-            open(path.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0644);  // NOLINT(cppcoreguidelines-pro-type-vararg)
-        if (lock->file < 0 || flock(lock->file, LOCK_EX | LOCK_NB) != 0) {
-            return nullptr;
-        }
-#endif
-        return lock;
-    }
-};
-
 std::map<std::string, std::string> gameEnvironment(const ProjectLayout& project, const Settings& settings,
-                                                   PathStyle style) {
+                                                   PathStyle style, bool fullscreen) {
     std::map<std::string, std::string> env = {
         {"RECOMP_AC97_READY", "1"},
         {"RECOMP_APU_DSP_ACK", "0x83218810"},
@@ -272,6 +205,9 @@ std::map<std::string, std::string> gameEnvironment(const ProjectLayout& project,
         {"RECOMP_BLACK_MOUSE_SENSITIVITY", shortest(settings.mouseSensitivity)},
         {"RECOMP_BLACK_MOUSE_INVERT_Y", settings.invertY ? "1" : "0"},
     };
+    if (fullscreen) {
+        env["RECOMP_WINDOW_MODE"] = "borderless";
+    }
     if (settings.gpuRenderer) {
         env["RECOMP_KELVIN_GPU"] = "1";
         env["RECOMP_KGPU_CACHE"] = gamePath(project.localDirectory() / "kgpu-cache", style);  // compiled shaders
@@ -333,11 +269,8 @@ Result<fs::path> checkReadyToPlay(const ProjectLayout& project) {
     if (files.state != GameFilesState::Supported) {
         return Error{"The game files are missing or not the supported BLACK disc. Set up your disc first."};
     }
-    std::error_code error;
-    const fs::path game = project.gameDirectory();
-    if (!fs::is_regular_file(game / "GlobData.bin", error) || !fs::is_directory(game / "levels", error) ||
-        !fs::is_directory(game / "sound", error) || !fs::is_directory(game / "videos", error)) {
-        return Error{"Some of the disc's files are missing. Set up your disc again."};
+    if (const auto missing = missingDiscData(project.gameDirectory()); !missing.empty()) {
+        return Error{"The disc is missing " + std::string(missing) + ". Set up your disc again."};
     }
     return *executable;
 }
@@ -351,7 +284,8 @@ std::optional<std::string> texturePackProblem(const ProjectLayout& project, cons
     return std::nullopt;
 }
 
-Result<std::unique_ptr<GameSession>> GameSession::start(const ProjectLayout& project, const Settings& settings) {
+Result<std::unique_ptr<GameSession>> GameSession::start(const ProjectLayout& project, const Settings& settings,
+                                                        bool fullscreen) {
     const auto executable = checkReadyToPlay(project);
     if (!executable) {
         return executable.error();
@@ -363,7 +297,7 @@ Result<std::unique_ptr<GameSession>> GameSession::start(const ProjectLayout& pro
         return Error{*problem};
     }
     std::unique_ptr<GameSession> session(new GameSession());
-    session->m_lock = Lock::acquire(project);
+    session->m_lock = ProjectLock::acquire(project, ProjectLock::Use::GameSession);
     if (!session->m_lock) {
         return Error{"BLACK is already running from this folder."};
     }
@@ -420,7 +354,7 @@ Result<std::unique_ptr<GameSession>> GameSession::start(const ProjectLayout& pro
     }
     fs::copy_file(video, folder / "video.ini", fs::copy_options::overwrite_existing, error);
 
-    std::map<std::string, std::string> environment = gameEnvironment(project, settings, style);
+    std::map<std::string, std::string> environment = gameEnvironment(project, settings, style, fullscreen);
     const auto exeHash = sha256File(executable.value());
     const bool drawLog = !settings.kgpuDrawLogFrames.empty();
     Json launch;

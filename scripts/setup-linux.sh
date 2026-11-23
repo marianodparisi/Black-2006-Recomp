@@ -65,7 +65,7 @@ for required in "$toolkit/CMakeLists.txt" "$dsp/crates/emu-ffi/Cargo.toml"; do
 done
 if [[ ! -x "$project_root/.venv/bin/python" ]]; then python3 -m venv "$project_root/.venv"; fi
 python="$project_root/.venv/bin/python"
-"$python" -m pip install capstone==5.0.7
+"$python" -m pip install --no-cache-dir capstone==5.0.7
 if (( prepare_only )); then
     build_launcher "$project_root/build-release-launchers"
     exit 0

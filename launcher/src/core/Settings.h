@@ -6,6 +6,7 @@
 
 #include <array>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -133,5 +134,7 @@ int applyVideoIni(Settings& settings, std::string_view text);
 
 [[nodiscard]] Settings loadSettings(const ProjectLayout& project);
 [[nodiscard]] Result<bool> saveSettings(const ProjectLayout& project, const Settings& settings);
+/// Read, validate and save one batch while holding the project's settings lock.
+[[nodiscard]] Result<bool> updateSettings(const ProjectLayout& project, std::span<const std::string> assignments);
 
 }  // namespace black::core
