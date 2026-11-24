@@ -6,6 +6,7 @@
 
 #include <array>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -24,6 +25,7 @@ struct Settings {
     bool subtitles = true;
     bool skipStartupVideos = false;
     bool infiniteAmmo = false;
+    bool infiniteHealth = false;
     std::string silverWeaponMode = "native";  // native, force-on, force-off
     std::string textures = "original";        // original, hd-pack (the texture_pack_hd folder)
     std::string menuLanguage = "en-US";
@@ -132,5 +134,7 @@ int applyVideoIni(Settings& settings, std::string_view text);
 
 [[nodiscard]] Settings loadSettings(const ProjectLayout& project);
 [[nodiscard]] Result<bool> saveSettings(const ProjectLayout& project, const Settings& settings);
+/// Read, validate and save one batch while holding the project's settings lock.
+[[nodiscard]] Result<bool> updateSettings(const ProjectLayout& project, std::span<const std::string> assignments);
 
 }  // namespace black::core

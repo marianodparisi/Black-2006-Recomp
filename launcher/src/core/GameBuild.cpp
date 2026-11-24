@@ -290,7 +290,9 @@ BuildOutcome buildGame(const ProjectLayout& project, const Toolchain& toolchain,
     if (!isFile(venvPython) && runner.run(python->program, {"-m", "venv", toUtf8(root / ".venv")}, root) != 0) {
         return fail("Could not set up Python for the build (.venv).");
     }
-    if (runner.run(venvPython, {"-m", "pip", "install", "--disable-pip-version-check", "capstone==5.0.7"}, root) != 0) {
+    if (runner.run(venvPython,
+                   {"-m", "pip", "install", "--no-cache-dir", "--disable-pip-version-check", "capstone==5.0.7"},
+                   root) != 0) {
         return fail("Could not install the disassembler (capstone) for the build.");
     }
 

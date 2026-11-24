@@ -35,6 +35,7 @@ XisoBuilder sampleDisc() {
     disc.addFile("levels/m01/level.bin", "level one");
     disc.addFile("levels/m02/level.bin", "level two");
     disc.addFile("sound/music.bin", std::string(5 * 1024 * 1024 + 7, 'm'));
+    disc.addFile("videos/intro.bin", "intro");
     for (int i = 0; i < 120; ++i) {  // enough names to spill the root table into a second sector
         disc.addFile("data/file_with_a_long_name_number_" + std::to_string(i) + ".dat", std::to_string(i));
     }
@@ -131,7 +132,7 @@ TEST_CASE("Inspecting a disc image reports its release, size and file count with
     const auto source = inspectDiscSource(folder.path() / "disc.iso");
     REQUIRE(source.ok());
     CHECK(source.value().kind == DiscSource::Kind::Image);
-    CHECK(source.value().fileCount == 125);
+    CHECK(source.value().fileCount == 126);
     CHECK(source.value().totalBytes > 5 * 1024 * 1024);
     CHECK(source.value().release.state == GameFilesState::UnsupportedVersion);
     CHECK(source.value().release.sha256.size() == 64);
@@ -220,10 +221,13 @@ TEST_CASE("A folder of extracted files is copied the same way, without its saves
     const TempFolder folder;
     folder.write("extracted/default.xbe", "XBEH pretend executable");
     folder.write("extracted/levels/m01/level.bin", "level one");
+    folder.write("extracted/GlobData.bin", "globals");
+    folder.write("extracted/sound/music.bin", "music");
+    folder.write("extracted/videos/intro.bin", "intro");
     folder.write("extracted/UDATA/someone_elses_save.bin", "not mine");
     const DiscSource source = importable(folder.path() / "extracted");
     CHECK(source.kind == DiscSource::Kind::Folder);
-    CHECK(source.fileCount == 2);
+    CHECK(source.fileCount == 5);
 
     const auto result = importDisc(source, folder.path() / "game", {}, {});
     REQUIRE(result.ok());
@@ -233,4 +237,21 @@ TEST_CASE("A folder of extracted files is copied the same way, without its saves
     const auto noXbe = inspectDiscSource(folder.path() / "extracted" / "levels");
     REQUIRE_FALSE(noXbe.ok());
     CHECK(noXbe.error().message.find("default.xbe") != std::string::npos);
+}
+
+TEST_CASE("Disc import rejects missing or mistyped data even for the in-place folder") {
+    const TempFolder folder;
+    folder.write("disc/default.xbe", "XBEH pretend executable");
+    const auto partial = importable(folder.path() / "disc");
+    for (const auto destination : {"game", "disc"}) {
+        const auto result = importDisc(partial, folder.path() / destination, {}, {});
+        REQUIRE_FALSE(result.ok());
+        CHECK(result.error().message.find("GlobData.bin") != std::string::npos);
+    }
+    CHECK_FALSE(std::filesystem::exists(folder.path() / "game"));
+    folder.write("disc/GlobData.bin", "globals");
+    folder.write("disc/levels", "wrong type");
+    const auto wrongType = importDisc(importable(folder.path() / "disc"), folder.path() / "game", {}, {});
+    REQUIRE_FALSE(wrongType.ok());
+    CHECK(wrongType.error().message.find("levels") != std::string::npos);
 }

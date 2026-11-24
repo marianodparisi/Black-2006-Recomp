@@ -28,8 +28,8 @@ def fixture(name, entries):
 class CombatGeneratorTests(unittest.TestCase):
     def test_supported_boundaries_and_idempotence(self):
         table = sites()
-        self.assertEqual(len(table), 2)
-        self.assertEqual(sum(map(len, table.values())), 4)
+        self.assertEqual(len(table), 7)
+        self.assertEqual(sum(map(len, table.values())), 9)
         for name, entries in table.items():
             original = fixture(name, entries)
             hooked = generate.gameplay_tuning_hooks(name, original)

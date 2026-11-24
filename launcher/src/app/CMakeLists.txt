@@ -38,7 +38,10 @@ if(WIN32)
     target_link_libraries(black_launcher PRIVATE ole32 shell32)
     # Release builds open no console window; Debug keeps the console for logs. Both start at main().
     if(MSVC)
-        target_link_options(black_launcher PRIVATE $<$<NOT:$<CONFIG:Debug>>:/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup>)
+        # Disc import, building and --play do not initialize Walnut or call Vulkan.
+        target_link_libraries(black_launcher PRIVATE delayimp)
+        target_link_options(black_launcher PRIVATE /DELAYLOAD:vulkan-1.dll
+            $<$<NOT:$<CONFIG:Debug>>:/SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup>)
     endif()
 endif()
 black_launcher_warnings(black_launcher)

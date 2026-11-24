@@ -20,17 +20,21 @@ TEST_CASE("The game environment follows the settings") {
     CHECK(env.at("RECOMP_BLACK_MOUSE_SENSITIVITY") == "1.25");
     CHECK(env.at("RECOMP_BLACK_BIND_FIRE") == "Mouse2");
     CHECK(env.at("RECOMP_BLACK_BIND_CROUCH") == "LCtrl,C");
+    CHECK_FALSE(env.contains("RECOMP_WINDOW_MODE"));
+    CHECK(gameEnvironment(project, settings, PathStyle::Native, true).at("RECOMP_WINDOW_MODE") == "borderless");
     CHECK(env.at("RECOMP_LANGUAGE") == "en-US");
     CHECK_FALSE(env.contains("RECOMP_BLACK_HZ"));
     CHECK_FALSE(env.contains("RECOMP_KELVIN_ASSIST_QUEUE"));
     CHECK_FALSE(env.contains("RECOMP_PAD_SCRIPT"));
     CHECK_FALSE(env.contains("RECOMP_BLACK_SKIP_STARTUP_VIDEOS"));
+    CHECK(env.at("RECOMP_BLACK_INFINITE_HEALTH") == "0");
 
     settings.smoothHz = 120;
     settings.internalHeight = 1440;
     settings.cameraAspect = "21:9";
     settings.skipStartupVideos = true;
     settings.silverWeaponMode = "force-off";
+    settings.infiniteHealth = true;
     env = gameEnvironment(project, settings, PathStyle::Native);
     CHECK(env.at("RECOMP_BLACK_HZ") == "120");
     CHECK_FALSE(env.contains("RECOMP_BLACK_60HZ"));
@@ -38,6 +42,7 @@ TEST_CASE("The game environment follows the settings") {
     CHECK(env.at("RECOMP_BLACK_SILVER_WEAPONS") == "0");
     CHECK_FALSE(env.contains("RECOMP_PAD_SCRIPT"));
     CHECK(env.at("RECOMP_BLACK_SKIP_STARTUP_VIDEOS") == "1");
+    CHECK(env.at("RECOMP_BLACK_INFINITE_HEALTH") == "1");
     CHECK_FALSE(env.contains("RECOMP_BLACK_SKIP_MOVIES"));
 }
 

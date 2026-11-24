@@ -337,6 +337,8 @@
   "Could not create the HD pack folder: {0}": "Não foi possível criar a pasta do pacote HD: {0}",
   "Extract the HD pack into this folder, then select HD Pack.": "Extraia o pacote HD nesta pasta e selecione Pacote HD.",
   "INFINITE AMMO": "MUNIÇÃO INFINITA",
+  "INFINITE HEALTH": "VIDA INFINITA",
+  "Blocks normal player damage. Restart the game to apply.": "Bloqueia o dano normal ao jogador. Reinicie o jogo para aplicar.",
   "Weapons never run out.": "As armas nunca ficam sem munição.",
   "SILVER WEAPONS": "ARMAS PRATEADAS",
   "The silver weapons the game unlocks on Hard. Game keeps its own rules.": "As armas prateadas que o jogo libera no Difícil. Jogo mantém as regras dele.",

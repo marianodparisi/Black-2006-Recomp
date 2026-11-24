@@ -195,8 +195,22 @@ Result<bool> importDisc(const DiscSource& source, const fs::path& gameDirectory,
     };
 
     std::error_code error;
+    if (source.release.state != GameFilesState::Supported) {
+        return Error{"This is not the supported Xbox retail release of BLACK, so it was not copied."};
+    }
+    for (const auto& required : kRequiredDiscData) {
+        if (std::ranges::none_of(source.files, [&](const auto& entry) {
+                return entry.directory == required.directory && sameName(entry.path, required.name);
+            })) {
+            return Error{"The disc is missing " + std::string(required.name) +
+                         ". Choose the complete disc image or folder."};
+        }
+    }
     if (source.kind == DiscSource::Kind::Folder && fs::exists(gameDirectory, error) &&
         fs::equivalent(source.location, gameDirectory, error)) {
+        if (const auto missing = missingDiscData(gameDirectory); !missing.empty()) {
+            return Error{"The game folder is missing " + std::string(missing)};
+        }
         state.stage = ImportProgress::Stage::Done;
         state.doneBytes = state.totalBytes;
         state.doneFiles = state.totalFiles;
@@ -206,9 +220,6 @@ Result<bool> importDisc(const DiscSource& source, const fs::path& gameDirectory,
 
     state.stage = ImportProgress::Stage::Checking;
     report();
-    if (source.release.state != GameFilesState::Supported) {
-        return Error{"This is not the supported Xbox retail release of BLACK, so it was not copied."};
-    }
     const std::uint64_t needed = bytesStillNeeded(source, gameDirectory);
     const fs::space_info space = fs::space(existingAncestor(gameDirectory), error);
     if (!error && space.available < needed + kFreeSpaceMargin) {
@@ -279,6 +290,9 @@ Result<bool> importDisc(const DiscSource& source, const fs::path& gameDirectory,
     state.stage = ImportProgress::Stage::Finishing;
     state.item.clear();
     report();
+    if (const auto missing = missingDiscData(gameDirectory); !missing.empty()) {
+        return Error{"The game folder is missing " + std::string(missing)};
+    }
     const GameFilesStatus copied = inspectGameFiles(gameDirectory / kXbe);
     if (copied.sha256 != source.release.sha256) {
         return Error{

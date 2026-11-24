@@ -123,3 +123,22 @@ TEST_CASE("HD pack folder is created and opened only by the explicit folder acti
     CHECK(failed.page().noticeIsProblem);
     CHECK(failed.page().notice == "The file manager could not be opened.");
 }
+
+TEST_CASE("Infinite health is an independent persisted Game setting") {
+    const black::tests::TempFolder folder;
+    const black::core::ProjectLayout project(folder.path());
+    black::app::setLanguage("en-US");
+    black::app::SettingsFlow flow(project);
+    flow.handle({row(flow.page(), "GAME"), 0});
+    const auto health = row(flow.page(), "INFINITE HEALTH");
+    CHECK(flow.page().rows[health].value == "OFF");
+    flow.handle({health, 1});
+    CHECK(flow.page().rows[health].value == "ON");
+    const auto saved = black::core::loadSettings(project);
+    CHECK(saved.infiniteHealth);
+    CHECK_FALSE(saved.infiniteAmmo);
+    flow.reload();
+    CHECK(flow.page().rows[health].value == "ON");
+    flow.handle({health, -1});
+    CHECK_FALSE(black::core::loadSettings(project).infiniteHealth);
+}

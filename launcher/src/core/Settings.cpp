@@ -1,6 +1,7 @@
 #include "core/Settings.h"
 
 #include "core/Files.h"
+#include "core/ProjectLock.h"
 #include "core/Text.h"
 
 #include <nlohmann/json.hpp>
@@ -389,6 +390,7 @@ std::string settingsJson(const Settings& s) {
     json["Subtitles"] = s.subtitles;
     json["SkipStartupVideos"] = s.skipStartupVideos;
     json["InfiniteAmmo"] = s.infiniteAmmo;
+    json["InfiniteHealth"] = s.infiniteHealth;
     json["SilverWeaponMode"] = s.silverWeaponMode;
     json["Textures"] = s.textures;
     json["MenuLanguage"] = s.menuLanguage;
@@ -456,6 +458,7 @@ Settings settingsFromJson(std::string_view text) {
     readField(json, json.contains("SkipStartupVideos") ? "SkipStartupVideos" : "AdvanceMenus", s.skipStartupVideos,
               kAny);
     readField(json, "InfiniteAmmo", s.infiniteAmmo, kAny);
+    readField(json, "InfiniteHealth", s.infiniteHealth, kAny);
     readField(json, "SilverWeaponMode", s.silverWeaponMode, among(choices::kSilverWeapons));
     readField(json, "Textures", s.textures, among(choices::kTextures));
     if (!json.contains("SilverWeaponMode") && json.value("SilverWeapons", false)) {
@@ -515,7 +518,60 @@ Settings settingsFromJson(std::string_view text) {
     return s;
 }
 
-Settings loadSettings(const ProjectLayout& project) {
+namespace {
+
+Result<Settings> withSettingAssignments(const Settings& saved, std::span<const std::string> assignments) {
+    // Compare binding maps by key, independent of the order used on the command line.
+    using Values = nlohmann::json;
+    Values requested = Values::parse(settingsJson(saved));
+    for (const auto& assignment : assignments) {
+        const auto equals = assignment.find('=');
+        const auto key = assignment.substr(0, equals);
+        if (equals == std::string::npos || key == "SettingsVersion" || !requested.contains(key)) {
+            return Error{"Expected a setting from --settings in the form Name=value: " + assignment};
+        }
+        const auto value = assignment.substr(equals + 1);
+        auto& field = requested[key];
+        Values parsed = field.is_string() ? Values(value) : Values::parse(value, nullptr, false);
+        if (parsed.is_discarded() || (field.is_number_integer() && !parsed.is_number_integer())) {
+            return Error{"Invalid value for " + key};
+        }
+        if (key == "Bindings") {
+            if (!parsed.is_object()) {
+                return Error{"Bindings must be an object of action names and keys."};
+            }
+            bindings::Overrides overrides;
+            for (const auto& [name, keys] : parsed.items()) {
+                const auto* action = bindings::findAction(name);
+                if (action == nullptr || !keys.is_string()) {
+                    return Error{"Invalid binding for " + name};
+                }
+                const auto& valueText = keys.get_ref<const std::string&>();
+                if (const auto problem = bindings::problem(valueText)) {
+                    return Error{"Invalid binding for " + name + ": " + *problem};
+                }
+                if (!overrides.emplace(std::string(action->name), valueText).second) {
+                    return Error{"Duplicate binding for " + name};
+                }
+            }
+            parsed = bindings::repair(overrides);  // explicit defaults are stored by removing the override
+        }
+        field = std::move(parsed);
+        // The existing settings reader validates types, ranges, enum choices and binding names.
+        // A rejected field falls back to its default. Reject that substitution on the command line.
+        const Settings checked = settingsFromJson(requested.dump());
+        if (Values::parse(settingsJson(checked)).at(key) != field) {
+            return Error{"Invalid value for " + key};
+        }
+    }
+    Settings settings = settingsFromJson(requested.dump());
+    if (const auto problem = settingsProblem(settings)) {
+        return Error{*problem};
+    }
+    return settings;
+}
+
+Settings readSettings(const ProjectLayout& project) {
     const std::filesystem::path local = project.localDirectory();
     Settings settings = defaultSettings();
     if (auto json = readFile(local / "xbox-launcher.json")) {
@@ -536,7 +592,7 @@ Settings loadSettings(const ProjectLayout& project) {
     return settings;
 }
 
-Result<bool> saveSettings(const ProjectLayout& project, const Settings& settings) {
+Result<bool> writeSettings(const ProjectLayout& project, const Settings& settings) {
     const std::filesystem::path local = project.localDirectory();
     std::error_code error;
     std::filesystem::create_directories(local, error);
@@ -567,6 +623,33 @@ Result<bool> saveSettings(const ProjectLayout& project, const Settings& settings
         }
     }
     return true;
+}
+
+}  // namespace
+
+Settings loadSettings(const ProjectLayout& project) {
+    const auto lock = ProjectLock::acquire(project, ProjectLock::Use::Settings);
+    return readSettings(project);
+}
+
+Result<bool> saveSettings(const ProjectLayout& project, const Settings& settings) {
+    const auto lock = ProjectLock::acquire(project, ProjectLock::Use::Settings);
+    if (!lock) {
+        return Error{"Could not lock the project settings."};
+    }
+    return writeSettings(project, settings);
+}
+
+Result<bool> updateSettings(const ProjectLayout& project, std::span<const std::string> assignments) {
+    const auto lock = ProjectLock::acquire(project, ProjectLock::Use::Settings);
+    if (!lock) {
+        return Error{"Could not lock the project settings."};
+    }
+    const auto changed = withSettingAssignments(readSettings(project), assignments);
+    if (!changed) {
+        return changed.error();
+    }
+    return writeSettings(project, changed.value());
 }
 
 }  // namespace black::core

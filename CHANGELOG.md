@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+**Infinite Health (optional).** Settings > Game can block ordinary player damage
+through the game's own invulnerability checks. It defaults to Off and applies
+on the next launch. Enemy damage and scripted mission failure rules are retained.
+
+**Disc reads on 4Kn drives.** Windows file buffering stays enabled for Xbox disc
+reads so 2048-byte sector requests also work on 4096-byte-sector host drives.
+
+**Linux build entry point.** `sh './Build BLACK.sh'` works as well as direct
+execution and Bash. The entry script forwards to the Bash build without failing
+on `pipefail` in POSIX sh.
+
 **SFX and music volumes are kept.** The game's own save never brought them back, so they returned to full at every
 start. They are now kept in `local/audio.ini`, saved when changed in either sound menu and restored at startup, with
 or without a saved profile.

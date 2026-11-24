@@ -156,6 +156,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Kernel bridge test build failed' }
           ctest --test-dir build-kernel-bridge -C Release --output-on-failure
           if ($LASTEXITCODE -ne 0) { throw 'Kernel bridge regression failed' }
+      - name: Build and run Windows host file buffering regression
+        shell: pwsh
+        run: |
+          cmake -S third_party/xboxrecomp/tests/kernel_file_buffers -B build-file-buffers -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'File buffering configure failed' }
+          foreach ($configuration in @('Release', 'Debug')) {
+            cmake --build build-file-buffers --config $configuration
+            if ($LASTEXITCODE -ne 0) { throw 'File buffering build failed' }
+            ctest --test-dir build-file-buffers -C $configuration --output-on-failure
+            if ($LASTEXITCODE -ne 0) { throw 'File buffering regression failed' }
+          }
       - name: Build and run BLACK audio completion regressions
         shell: pwsh
         run: |
